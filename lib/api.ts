@@ -495,6 +495,8 @@ export type Vendor = {
   ownerName: string;
   category: VendorCategory;
   email: string;
+  // false for an account made with Google that never set a password.
+  hasPassword: boolean;
 };
 
 export type SignUpInput = {
@@ -598,4 +600,76 @@ export async function changePassword(
     throw new ValidationError(body.error, body.fields ?? []);
   }
   if (!res.ok) throw new Error(`POST change-password failed: ${res.status}`);
+}
+
+// Forgot password. Both use plain fetch: they're called signed out, and a
+// 400 is a form error to show, not a redirect.
+export async function requestPasswordReset(email: string): Promise<void> {
+  const res = await fetch(`${API_URL}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (res.status === 400) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`POST forgot-password failed: ${res.status}`);
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${API_URL}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, newPassword }),
+  });
+  if (res.status === 400) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`POST reset-password failed: ${res.status}`);
+}
+
+// Sign in with Google. Both use plain fetch (called signed out; a 401/400 is
+// a message to show, not a redirect).
+export type GoogleSignInResult =
+  | { status: "signed_in"; vendor: Vendor }
+  | { status: "needs_setup"; ticket: string; email: string; name: string };
+
+export async function googleSignIn(credential: string): Promise<GoogleSignInResult> {
+  const res = await fetch(`${API_URL}/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ credential }),
+  });
+  if (res.status === 401) {
+    const body: { error: string } = await res.json();
+    throw new ValidationError(body.error, []);
+  }
+  if (!res.ok) throw new Error(`POST google failed: ${res.status}`);
+  return res.json();
+}
+
+export type GoogleSignUpInput = {
+  ticket: string;
+  businessName: string;
+  businessAddress: string;
+  businessPhone?: string;
+  logoDataUrl?: string;
+  ownerName: string;
+  category: VendorCategory | "";
+};
+
+export async function googleSignUp(input: GoogleSignUpInput): Promise<Vendor> {
+  const res = await fetch(`${API_URL}/auth/google/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 400 || res.status === 409) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`POST google/signup failed: ${res.status}`);
+  return res.json();
 }

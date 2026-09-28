@@ -154,6 +154,15 @@ body {
     font-weight: 700;
     text-decoration: none;
   }
+  .forgot {
+    display: block;
+    width: fit-content;
+    font-size: 12.5px;
+    color: var(--brand);
+    font-weight: 600;
+    text-decoration: none;
+    margin: -12px 0 20px auto;
+  }
   .readonly-row {
     display: flex;
     justify-content: space-between;

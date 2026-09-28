@@ -10,7 +10,16 @@ import { NextRequest, NextResponse } from "next/server";
 // reading it; this proxy reads the request's Cookie header directly, same
 // as any server.
 const SESSION_COOKIE = "bad_session";
-const PUBLIC_VENDOR_PATHS = ["/vendor/login", "/vendor/signup"];
+// Reachable signed out. Only login and sign up bounce a signed-in visitor
+// back to the dashboard; the reset pages don't, since someone may open a
+// reset link while an old session is still around.
+const PUBLIC_VENDOR_PATHS = [
+  "/vendor/login",
+  "/vendor/signup",
+  "/vendor/forgot-password",
+  "/vendor/reset-password",
+];
+const BOUNCE_WHEN_SIGNED_IN = ["/vendor/login", "/vendor/signup"];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -24,7 +33,7 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (signedIn && isPublicPath) {
+  if (signedIn && BOUNCE_WHEN_SIGNED_IN.includes(pathname)) {
     const url = req.nextUrl.clone();
     url.pathname = "/vendor";
     url.search = "";

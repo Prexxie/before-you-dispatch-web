@@ -257,7 +257,13 @@ function AccountCard({ vendor }: { vendor: Vendor }) {
   const [changing, setChanging] = useState(false);
 
   if (changing) {
-    return <ChangePasswordForm onCancel={() => setChanging(false)} onSaved={() => setChanging(false)} />;
+    return (
+      <ChangePasswordForm
+        hasPassword={vendor.hasPassword}
+        onCancel={() => setChanging(false)}
+        onSaved={() => setChanging(false)}
+      />
+    );
   }
 
   return (
@@ -277,14 +283,22 @@ function AccountCard({ vendor }: { vendor: Vendor }) {
           className="btn btn-secondary"
           style={{ minHeight: 36, padding: "0 14px", fontSize: 13 }}
         >
-          Change Password
+          {vendor.hasPassword ? "Change Password" : "Set Password"}
         </button>
       </div>
     </div>
   );
 }
 
-function ChangePasswordForm({ onCancel, onSaved }: { onCancel: () => void; onSaved: () => void }) {
+function ChangePasswordForm({
+  hasPassword,
+  onCancel,
+  onSaved,
+}: {
+  hasPassword: boolean;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -297,7 +311,8 @@ function ChangePasswordForm({ onCancel, onSaved }: { onCancel: () => void; onSav
     e.preventDefault();
     setError(null);
     const bad: string[] = [];
-    if (!currentPassword) bad.push("currentPassword");
+    // An account made with Google has no current password to check.
+    if (hasPassword && !currentPassword) bad.push("currentPassword");
     if (newPassword.length < 8) bad.push("newPassword");
     if (newPassword !== confirmPassword) bad.push("confirmPassword");
     setFieldErrors(bad);
@@ -347,22 +362,31 @@ function ChangePasswordForm({ onCancel, onSaved }: { onCancel: () => void; onSav
   return (
     <form onSubmit={submit} noValidate className="card">
       <p className="h2" style={{ fontSize: 16 }}>
-        Change password
+        {hasPassword ? "Change password" : "Set a password"}
       </p>
 
-      <label className="field-label" htmlFor="currentPassword">
-        Current password
-      </label>
-      <input
-        id="currentPassword"
-        className="field"
-        type="password"
-        autoComplete="current-password"
-        value={currentPassword}
-        onChange={(e) => setCurrentPassword(e.target.value)}
-        aria-invalid={invalid("currentPassword")}
-        required
-      />
+      {hasPassword ? (
+        <>
+          <label className="field-label" htmlFor="currentPassword">
+            Current password
+          </label>
+          <input
+            id="currentPassword"
+            className="field"
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            aria-invalid={invalid("currentPassword")}
+            required
+          />
+        </>
+      ) : (
+        <p className="sub" style={{ marginBottom: 18 }}>
+          You signed up with Google, so you don&apos;t have a password yet. Set
+          one to also log in with your email.
+        </p>
+      )}
 
       <label className="field-label" htmlFor="newPassword">
         New password
