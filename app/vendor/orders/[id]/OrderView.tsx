@@ -372,6 +372,19 @@ function Progress({ order }: { order: VendorOrder }) {
       state: order.pickedUpAt ? "done" : finished || order.receivedAt ? "todo" : "current",
       at: formatTime(order.pickedUpAt),
     },
+    {
+      label: order.arrivedAt
+        ? `${rider} arrived at ${customer}'s location`
+        : `${rider} arrives at ${customer}'s location`,
+      state: order.arrivedAt
+        ? "done"
+        : finished || order.receivedAt
+          ? "todo"
+          : order.pickedUpAt
+            ? "current"
+            : "todo",
+      at: formatTime(order.arrivedAt),
+    },
   ];
   if (order.status === "failed") {
     steps.push({

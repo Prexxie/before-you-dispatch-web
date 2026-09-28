@@ -7,6 +7,7 @@ import {
   FAILURE_REASON_LABELS,
   FailureReason,
   RiderJob,
+  confirmArrived,
   confirmPickup,
   getRiderJob,
   submitOutcome,
@@ -34,6 +35,7 @@ import {
   NextStopIcon,
   NoteIcon,
   PackageIcon,
+  PinCheckIcon,
 } from "@/components/icons";
 
 // Leaflet touches `window` on import, so it can only load in the browser.
@@ -125,7 +127,15 @@ export default function RiderFlow({ token }: { token: string }) {
   if (!job.pickedUpAt || !job.location) {
     return <PickupScreen token={token} job={job} onChange={setJob} />;
   }
-  return <EnRouteScreen job={job} location={job.location} onCouldntDeliver={() => setFailing(true)} />;
+  return (
+    <EnRouteScreen
+      token={token}
+      job={job}
+      location={job.location}
+      onChange={setJob}
+      onCouldntDeliver={() => setFailing(true)}
+    />
+  );
 }
 
 // Design: "Rider: Assigned Delivery" (pickup leg only; the customer's pin
@@ -232,16 +242,40 @@ function PickupScreen({
 
 // Design: "Rider: Heading to Customer" (post-pickup, pre-receipt).
 function EnRouteScreen({
+  token,
   job,
   location,
+  onChange,
   onCouldntDeliver,
 }: {
+  token: string;
   job: RiderJob;
   location: NonNullable<RiderJob["location"]>;
+  onChange: (job: RiderJob) => void;
   onCouldntDeliver: () => void;
 }) {
   const { lat, lng, landmarkNote } = location;
   const customer = firstName(job.customerName);
+  const [arriving, setArriving] = useState(false);
+  const [arriveError, setArriveError] = useState<string | null>(null);
+
+  async function arrived() {
+    setArriving(true);
+    setArriveError(null);
+    try {
+      const result = await confirmArrived(token);
+      onChange({ ...job, arrivedAt: result.arrivedAt });
+    } catch (err) {
+      setArriveError(
+        err instanceof ConflictError
+          ? err.message
+          : "That didn't go through. Check your connection and try again.",
+      );
+    } finally {
+      setArriving(false);
+    }
+  }
+
   return (
     <PhoneScreen>
       <p className="eyebrow">Order #{job.orderNumber}</p>
@@ -249,6 +283,12 @@ function EnRouteScreen({
         <CheckIcon size={10} />
         Picked up &middot; {formatTime(job.pickedUpAt!)}
       </span>
+      {job.arrivedAt && (
+        <span className="badge badge-accent pickup-badge" style={{ marginLeft: 8 }}>
+          <CheckIcon size={10} />
+          Arrived &middot; {formatTime(job.arrivedAt)}
+        </span>
+      )}
       <h1 className="h1">Heading to {customer}</h1>
       <p className="sub">
         You have the items. Use the pin and landmark note below to find them.
@@ -305,10 +345,34 @@ function EnRouteScreen({
         target="_blank"
         rel="noopener noreferrer"
         className="btn btn-secondary btn-block"
+        style={{ marginBottom: 14 }}
       >
         <DirectionsIcon />
         Get Directions
       </a>
+
+      {job.arrivedAt ? (
+        <button className="btn btn-locked btn-block" disabled>
+          <CheckIcon size={15} />
+          Arrived at {customer}&apos;s Location
+        </button>
+      ) : (
+        <>
+          <button onClick={arrived} disabled={arriving} className="btn btn-primary btn-block">
+            <PinCheckIcon />
+            {arriving ? "Confirming…" : "I've Arrived"}
+          </button>
+          <p className="caption">
+            Tap this once you&apos;re at {customer}&apos;s location. They&apos;ll see
+            you&apos;ve arrived.
+          </p>
+          {arriveError && (
+            <p className="mt-3 text-sm font-semibold text-danger" role="alert">
+              {arriveError}
+            </p>
+          )}
+        </>
+      )}
 
       <div className="wait-strip" role="status">
         <ClockIcon />

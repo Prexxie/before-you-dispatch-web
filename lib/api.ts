@@ -31,6 +31,8 @@ export type ConfirmationDetails = {
   rider: { name: string; phone: string } | null;
   // When the rider collected the order from the vendor.
   pickedUpAt: string | null;
+  // When the rider tapped "I've arrived" at the customer's location.
+  arrivedAt: string | null;
   // When they tapped "I've received my delivery".
   receivedAt: string | null;
 };
@@ -122,6 +124,7 @@ export type VendorOrder = {
   locationSavedAt: string | null;
   dispatchedAt: string | null;
   pickedUpAt: string | null;
+  arrivedAt: string | null;
   receivedAt: string | null;
   completedAt: string | null;
   failureReason: FailureReason | null;
@@ -145,6 +148,8 @@ export type RiderJob = {
   vendor: VendorInfo | null;
   // Set once the rider confirms they collected the order.
   pickedUpAt: string | null;
+  // Set once the rider taps "I've arrived" at the customer's location.
+  arrivedAt: string | null;
   // Set once the customer confirms receipt; completing needs it.
   receivedAt: string | null;
   deliveryConfirmedBy: DeliveryConfirmer | null;
@@ -359,6 +364,19 @@ export async function confirmPickup(
   return res.json();
 }
 
+// The rider confirms they've reached the customer's location. Purely a
+// status update: doesn't unlock anything, harmless to tap again.
+export async function confirmArrived(
+  token: string,
+): Promise<{ arrivedAt: string }> {
+  const res = await fetch(
+    `${API_URL}/rider/${encodeURIComponent(token)}/arrived`,
+    { method: "POST" },
+  );
+  if (!res.ok) return conflictOrThrow(res, "POST arrived");
+  return res.json();
+}
+
 export type Outcome =
   | { outcome: "delivered" }
   | { outcome: "failed"; reason: FailureReason };
@@ -389,6 +407,7 @@ export type OrderSummary = {
   status: OrderStatus;
   hasLocation: boolean;
   pickedUpAt: string | null;
+  arrivedAt: string | null;
   receivedAt: string | null;
   failureReason: FailureReason | null;
   deliveryConfirmedBy: DeliveryConfirmer | null;
@@ -486,6 +505,18 @@ export const VENDOR_CATEGORY_LABELS: Record<VendorCategory, string> = {
   other: "Other",
 };
 
+// A cosmetic accent for the vendor's own dashboard (design: "Vendor:
+// Settings", Workspace theme). Never seen by customers or riders.
+export type ThemeColor = "green" | "crimson" | "navy" | "amber" | "purple";
+
+export const THEME_COLOR_SWATCHES: Record<ThemeColor, string> = {
+  green: "#065F46",
+  crimson: "#9F1239",
+  navy: "#1E3A5F",
+  amber: "#7C4A03",
+  purple: "#4A2E6B",
+};
+
 export type Vendor = {
   id: string;
   businessName: string;
@@ -494,6 +525,7 @@ export type Vendor = {
   logoUrl: string | null;
   ownerName: string;
   category: VendorCategory;
+  themeColor: ThemeColor;
   email: string;
   // false for an account made with Google that never set a password.
   hasPassword: boolean;
@@ -567,6 +599,7 @@ export type UpdateVendorInput = Partial<{
   logoDataUrl: string;
   ownerName: string;
   category: VendorCategory;
+  themeColor: ThemeColor;
 }>;
 
 export async function updateVendorProfile(input: UpdateVendorInput): Promise<Vendor> {

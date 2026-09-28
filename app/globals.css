@@ -37,6 +37,7 @@
   --color-brand-dark: var(--brand-dark);
   --color-brand-tint: var(--brand-tint);
   --color-accent: var(--accent);
+  --color-accent-tint: var(--accent-tint);
   --color-ink: var(--ink);
   --color-ink-soft: var(--ink-soft);
   --color-ink-faint: var(--ink-faint);
@@ -188,6 +189,34 @@ body {
     display: grid;
     gap: 20px;
     max-width: 640px;
+  }
+  .swatch-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .swatch {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    padding: 0;
+  }
+  .swatch.selected {
+    border-color: var(--ink);
+  }
+  .swatch:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+  .swatch:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
   }
   .logo-upload {
     display: flex;
@@ -448,6 +477,10 @@ body {
   .badge-neutral {
     background: #f3f1ec;
     color: #6b6558;
+  }
+  .badge-accent {
+    background: var(--accent);
+    color: #ffffff;
   }
 
   .row-flex {

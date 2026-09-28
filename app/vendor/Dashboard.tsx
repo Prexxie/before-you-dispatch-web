@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { OrderList, OrderStatus, VendorInfo, getOrders } from "@/lib/api";
+import {
+  OrderList,
+  OrderStatus,
+  VENDOR_CATEGORY_LABELS,
+  VendorInfo,
+  getMe,
+  getOrders,
+} from "@/lib/api";
 import { useLiveData } from "@/lib/useLiveData";
 import { statusBadge } from "@/lib/statusBadge";
 import { formatTime } from "@/lib/time";
@@ -26,6 +33,9 @@ export default function Dashboard() {
     key,
   );
   const data = state.kind === "ready" ? state.data : null;
+  const [meState] = useLiveData(() => getMe(), "dashboard-me");
+  const category = meState.kind === "ready" ? meState.data?.category : null;
+  const themeColor = meState.kind === "ready" ? meState.data?.themeColor : undefined;
 
   function changeFilter(next: Filter) {
     setFilter(next);
@@ -33,7 +43,13 @@ export default function Dashboard() {
   }
 
   return (
-    <AppShell active="dashboard" title="Dashboard" businessName={data?.vendorName ?? null}>
+    <AppShell
+      active="dashboard"
+      title="Dashboard"
+      businessName={data?.vendorName ?? null}
+      businessCategory={category ? VENDOR_CATEGORY_LABELS[category] : null}
+      themeColor={themeColor}
+    >
       <BusinessHeader vendor={data?.vendor ?? null} today={data?.today ?? null} />
       {state.kind === "loading" && <p className="sub">Loading orders…</p>}
       {state.kind === "error" && (

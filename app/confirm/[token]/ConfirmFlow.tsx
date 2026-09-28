@@ -16,6 +16,7 @@ import {
   CheckIcon,
   LogoMark,
   MinusCircleIcon,
+  PinIcon,
   RiderIcon,
 } from "@/components/icons";
 import PhoneScreen, {
@@ -229,6 +230,8 @@ function StatusScreen({
   const vendor = details.vendor?.name ?? "the business";
   const rider = details.rider ? firstName(details.rider.name) : "The rider";
   const received = details.status === "dispatched" && details.receivedAt !== null;
+  const arrived =
+    details.status === "dispatched" && details.arrivedAt !== null && !received;
 
   const screens: Record<Exclude<OrderStatus, "pending_confirmation" | "confirmed">, Screen> = {
     // Design: "Customer: Not Now"
@@ -276,7 +279,17 @@ function StatusScreen({
         sub: `We've let ${vendor} know. ${rider} will now mark the delivery completed.`,
         badge: ["badge-success", "Received"],
       }
-    : screens[details.status as keyof typeof screens];
+    : // Design: "Customer: Rider Arrived"
+      arrived
+      ? {
+          icon: <PinIcon />,
+          tone: "accent",
+          eyebrow: `Hi ${first}`,
+          title: "Your rider has arrived",
+          sub: `${rider} is at your location with your delivery.`,
+          badge: ["badge-accent", "Arrived"],
+        }
+      : screens[details.status as keyof typeof screens];
 
   return (
     <ResultScreen icon={s.icon} tone={s.tone} eyebrow={s.eyebrow} title={s.title} sub={s.sub}>

@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import {
   CreateRiderInput,
   Rider,
+  VENDOR_CATEGORY_LABELS,
   ValidationError,
   Vehicle,
   createRider,
@@ -35,13 +36,21 @@ export default function RidersPage() {
   const [meState] = useLiveData(() => getMe(), "riders-me");
   const riders = state.kind === "ready" ? state.data : null;
   const businessName = meState.kind === "ready" ? (meState.data?.businessName ?? null) : null;
+  const category = meState.kind === "ready" ? meState.data?.category : null;
+  const themeColor = meState.kind === "ready" ? meState.data?.themeColor : undefined;
 
   function reload() {
     setRefreshKey((k) => k + 1);
   }
 
   return (
-    <AppShell active="riders" title="Riders" businessName={businessName}>
+    <AppShell
+      active="riders"
+      title="Riders"
+      businessName={businessName}
+      businessCategory={category ? VENDOR_CATEGORY_LABELS[category] : null}
+      themeColor={themeColor}
+    >
       <p className="eyebrow">Your team</p>
       <h1 className="h1">Riders</h1>
       <p className="sub">

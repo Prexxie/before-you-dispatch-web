@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import {
+  ThemeColor,
   UpdateVendorInput,
   VENDOR_CATEGORY_LABELS,
   ValidationError,
@@ -11,9 +12,11 @@ import {
   getMe,
   updateVendorProfile,
 } from "@/lib/api";
+import { THEME_COLOR_ORDER, THEME_PRESETS } from "@/lib/theme";
 import { useLiveData } from "@/lib/useLiveData";
 import LogoPicker from "@/components/LogoPicker";
 import AppShell from "@/components/AppShell";
+import { CheckIcon } from "@/components/icons";
 
 // Design: "Vendor: Settings". The mockup shows both cards read-only with an
 // "Edit Profile" / "Change Password" button but no edit form itself — those
@@ -28,7 +31,13 @@ export default function SettingsPage() {
   }
 
   return (
-    <AppShell active="settings" title="Settings" businessName={vendor?.businessName ?? null}>
+    <AppShell
+      active="settings"
+      title="Settings"
+      businessName={vendor?.businessName ?? null}
+      businessCategory={vendor ? VENDOR_CATEGORY_LABELS[vendor.category] : null}
+      themeColor={vendor?.themeColor}
+    >
       <p className="eyebrow">Workspace</p>
       <h1 className="h1">Settings</h1>
       <p className="sub">Manage your business profile and your account.</p>
@@ -43,6 +52,7 @@ export default function SettingsPage() {
       {vendor && (
         <div className="settings-grid">
           <ProfileCard vendor={vendor} onSaved={reload} />
+          <ThemeCard vendor={vendor} onSaved={reload} />
           <AccountCard vendor={vendor} />
         </div>
       )}
@@ -250,6 +260,66 @@ function ProfileEditForm({
         </p>
       )}
     </form>
+  );
+}
+
+// Design: "Vendor: Settings", Workspace theme. Swatches apply immediately
+// on click (the mockup shows no separate save button here) — only the
+// vendor's own dashboard chrome re-tints; the "Before You Dispatch" brand
+// mark and the customer/rider pages never change.
+function ThemeCard({ vendor, onSaved }: { vendor: Vendor; onSaved: () => void }) {
+  const [saving, setSaving] = useState<ThemeColor | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pick(color: ThemeColor) {
+    if (color === vendor.themeColor || saving) return;
+    setSaving(color);
+    setError(null);
+    try {
+      await updateVendorProfile({ themeColor: color });
+      onSaved();
+    } catch {
+      setError("Couldn't save. Check your connection and try again.");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return (
+    <div className="card">
+      <p className="h2" style={{ fontSize: 16 }}>
+        Workspace theme
+      </p>
+      <p className="sub" style={{ marginBottom: 0 }}>
+        Pick an accent color for your dashboard. The Before You Dispatch
+        brand stays the same everywhere else.
+      </p>
+      <div className="swatch-row" role="radiogroup" aria-label="Workspace theme">
+        {THEME_COLOR_ORDER.map((color) => {
+          const selected = vendor.themeColor === color;
+          return (
+            <button
+              key={color}
+              type="button"
+              className={`swatch ${selected ? "selected" : ""}`}
+              style={{ background: THEME_PRESETS[color].swatch }}
+              onClick={() => pick(color)}
+              disabled={saving !== null}
+              role="radio"
+              aria-checked={selected}
+              aria-label={THEME_PRESETS[color].label}
+            >
+              {selected && <CheckIcon size={14} />}
+            </button>
+          );
+        })}
+      </div>
+      {error && (
+        <p className="mt-3 text-sm font-semibold text-danger" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 

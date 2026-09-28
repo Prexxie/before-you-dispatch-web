@@ -19,6 +19,26 @@ export function LogoMark({ size = 20, className }: IconProps) {
 // The map pin: crimson pin with a white dot. Also used as a Leaflet marker.
 export const MAP_PIN_SVG = `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="${PIN_PATH}" fill="#9F1239"/><circle cx="12" cy="10" r="3" fill="#ffffff"/></svg>`;
 
+// Stroked pin outline: the "rider has arrived" state icon.
+export function PinIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d={PIN_PATH} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+// Pin with a checkmark inside: the "I've Arrived" button.
+export function PinCheckIcon({ size = 15 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d={PIN_PATH} stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M8.3 10.3l2.3 2.3 4.6-4.6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function PersonIcon({ size = 14 }: IconProps) {
   return (
     <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">

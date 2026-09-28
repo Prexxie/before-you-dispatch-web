@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
+import { ThemeColor } from "@/lib/api";
+import { themeStyle } from "@/lib/theme";
 import { LogoMark } from "./icons";
 import LogoutButton from "./LogoutButton";
 
@@ -10,16 +12,24 @@ export default function AppShell({
   active,
   title,
   businessName,
+  businessCategory,
+  themeColor,
   children,
 }: {
   active: Section;
   title: string;
   businessName: string | null;
+  // Design: the sidebar shows the vendor's category under their name
+  // ("Food & restaurant"), not anything about today.
+  businessCategory: string | null;
+  // Design: "Vendor: Settings", Workspace theme. Defaults to the app's own
+  // green while the vendor hasn't loaded yet, so nothing flashes untinted.
+  themeColor?: ThemeColor;
   children: ReactNode;
 }) {
   return (
     <div className="page">
-      <div className="app-shell">
+      <div className="app-shell" style={themeStyle(themeColor ?? "green")}>
         <nav className="sidebar" aria-label="Main">
           <div className="sidebar-brand">
             <LogoMark size={18} />
@@ -27,7 +37,7 @@ export default function AppShell({
           </div>
           <div className="sidebar-business">
             <strong>{businessName ?? "Your business"}</strong>
-            <span>Today&apos;s deliveries</span>
+            {businessCategory && <span>{businessCategory}</span>}
           </div>
           <Link
             href="/vendor"

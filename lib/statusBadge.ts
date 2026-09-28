@@ -11,6 +11,7 @@ export function statusBadge(order: {
   status: OrderStatus;
   hasLocation: boolean;
   pickedUpAt: string | null;
+  arrivedAt: string | null;
   receivedAt: string | null;
   failureReason: FailureReason | null;
   deliveryConfirmedBy: DeliveryConfirmer | null;
@@ -27,6 +28,9 @@ export function statusBadge(order: {
     case "dispatched":
       if (order.receivedAt) {
         return { className: "badge-success", label: "Received – rider to complete" };
+      }
+      if (order.arrivedAt) {
+        return { className: "badge-accent", label: "Arrived – waiting for confirmation" };
       }
       return order.pickedUpAt
         ? { className: "badge-filled", label: "Picked up – on the way" }
