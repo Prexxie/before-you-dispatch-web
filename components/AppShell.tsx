@@ -3,10 +3,9 @@ import { ReactNode } from "react";
 import { LogoMark } from "./icons";
 import LogoutButton from "./LogoutButton";
 
-type Section = "dashboard" | "create";
+type Section = "dashboard" | "create" | "riders" | "settings";
 
-// Sidebar + top bar from the "Vendor: Dashboard" design. Riders and
-// Settings arrive in weeks 2–3.
+// Sidebar + top bar from the "Vendor: Dashboard" design.
 export default function AppShell({
   active,
   title,
@@ -46,17 +45,25 @@ export default function AppShell({
             <PlusIcon />
             Create Delivery
           </Link>
-          <span className="nav-item" aria-disabled="true">
+          <Link
+            href="/vendor/riders"
+            className={`nav-item ${active === "riders" ? "active" : ""}`}
+            aria-current={active === "riders" ? "page" : undefined}
+          >
             <BikeIcon />
             Riders
-            <span className="nav-soon">Soon</span>
-          </span>
-          <span className="nav-item" aria-disabled="true">
+          </Link>
+          <Link
+            href="/vendor/settings"
+            className={`nav-item ${active === "settings" ? "active" : ""}`}
+            aria-current={active === "settings" ? "page" : undefined}
+          >
             <GearIcon />
             Settings
-            <span className="nav-soon">Soon</span>
-          </span>
-          <LogoutButton className="nav-item" />
+          </Link>
+          <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--border)" }}>
+            <LogoutButton className="nav-item" style={{ color: "var(--ink-faint)" }} showIcon />
+          </div>
         </nav>
 
         <div className="app-main">

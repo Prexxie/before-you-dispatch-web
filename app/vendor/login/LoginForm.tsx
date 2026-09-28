@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ValidationError, logIn } from "@/lib/api";
 
+// Design: "Vendor: Log In". The mockup also shows a "Continue with Google"
+// button and a "Forgot password?" link; both are left out here since
+// neither has anything behind it yet (no OAuth, no reset flow) — a working
+// email/password form beats a button that does nothing when tapped.
 export default function LoginForm() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -19,7 +21,7 @@ export default function LoginForm() {
     try {
       await logIn(email.trim(), password);
       // window.location, not router.push: a full navigation so the
-      // just-set session cookie is there for middleware's next check and
+      // just-set session cookie is there for the proxy's next check and
       // every page below reloads with a fresh, authenticated fetch.
       const next = new URLSearchParams(window.location.search).get("next");
       window.location.href = next && next.startsWith("/vendor") ? next : "/vendor";
@@ -35,13 +37,16 @@ export default function LoginForm() {
 
   return (
     <>
-      <p className="eyebrow">Vendor</p>
-      <h1 className="h1">Log in</h1>
-      <p className="sub">See and manage your deliveries.</p>
+      <p className="eyebrow" style={{ textAlign: "center" }}>
+        Welcome back
+      </p>
+      <p className="h1" style={{ textAlign: "center", fontSize: 24 }}>
+        Log in to your workspace
+      </p>
 
-      <form onSubmit={submit} noValidate className="card">
+      <form onSubmit={submit} noValidate className="card" style={{ marginTop: 20 }}>
         <label className="field-label" htmlFor="email">
-          Email
+          Email address
         </label>
         <input
           id="email"
@@ -69,7 +74,7 @@ export default function LoginForm() {
         />
 
         <button type="submit" disabled={submitting} className="btn btn-primary btn-block">
-          {submitting ? "Logging in…" : "Log in"}
+          {submitting ? "Logging in…" : "Log In"}
         </button>
         {error && (
           <p className="mt-3 text-sm font-semibold text-danger" role="alert">
@@ -78,7 +83,7 @@ export default function LoginForm() {
         )}
       </form>
 
-      <p className="sub">
+      <p className="auth-foot">
         New here? <Link href="/vendor/signup">Create an account</Link>
       </p>
     </>

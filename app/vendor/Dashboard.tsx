@@ -7,17 +7,9 @@ import { OrderList, OrderStatus, VendorInfo, getOrders } from "@/lib/api";
 import { useLiveData } from "@/lib/useLiveData";
 import { statusBadge } from "@/lib/statusBadge";
 import { formatTime } from "@/lib/time";
+import { initials } from "@/lib/format";
 import AppShell from "@/components/AppShell";
 import { LogoMark } from "@/components/icons";
-
-function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0];
 
@@ -82,7 +74,15 @@ function BusinessHeader({
   return (
     <div className="biz-header">
       <div className="biz-logo" aria-hidden="true">
-        {vendor ? initials(vendor.name) : <LogoMark size={22} />}
+        {vendor?.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a data
+          // URL stored on the vendor, not a servable static asset.
+          <img src={vendor.logoUrl} alt="" />
+        ) : vendor ? (
+          initials(vendor.name)
+        ) : (
+          <LogoMark size={22} />
+        )}
       </div>
       <div>
         <h1 className="h1" style={{ marginBottom: 2 }}>

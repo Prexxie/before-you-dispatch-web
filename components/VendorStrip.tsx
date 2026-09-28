@@ -8,7 +8,13 @@ export default function VendorStrip({ vendor }: { vendor: VendorInfo | null }) {
   return (
     <div className="vendor-strip">
       <span className="vendor-icon">
-        <StoreIcon />
+        {vendor.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a data
+          // URL stored on the vendor, not a servable static asset.
+          <img src={vendor.logoUrl} alt="" />
+        ) : (
+          <StoreIcon />
+        )}
       </span>
       <div>
         <strong>{vendor.name}</strong>

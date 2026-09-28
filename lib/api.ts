@@ -35,12 +35,14 @@ export type ConfirmationDetails = {
   receivedAt: string | null;
 };
 
-// The business a delivery comes from. Until vendor accounts exist it comes
-// from the API's DEMO_VENDOR_* settings; address and phone may be missing.
+// The business a delivery comes from, from the logged-in vendor's account.
+// name and address are always set (both required at sign up); phone and
+// logoUrl may be missing.
 export type VendorInfo = {
   name: string;
   address: string | null;
   phone: string | null;
+  logoUrl: string | null;
 };
 
 // Who confirmed the customer got their items (CLAUDE.md flow step 6).
@@ -74,6 +76,13 @@ export type Rider = {
   name: string;
   phone: string;
   vehicle: Vehicle | null;
+  active: boolean;
+};
+
+export type CreateRiderInput = {
+  name: string;
+  phone: string;
+  vehicle: Vehicle;
 };
 
 export type CreateOrderInput = {
@@ -198,9 +207,35 @@ export class LocationLockedError extends Error {
   }
 }
 
-export async function getRiders(): Promise<Rider[]> {
-  const res = await vendorFetch("/riders", { cache: "no-store" });
+// activeOnly: true is what the create-order dropdown wants; false (the
+// riders management page) gets every rider, deactivated ones included.
+export async function getRiders(opts: { activeOnly?: boolean } = {}): Promise<Rider[]> {
+  const qs = opts.activeOnly ? "?active=true" : "";
+  const res = await vendorFetch(`/riders${qs}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`GET riders failed: ${res.status}`);
+  return res.json();
+}
+
+export async function createRider(input: CreateRiderInput): Promise<Rider> {
+  const res = await vendorFetch("/riders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 400) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`POST riders failed: ${res.status}`);
+  return res.json();
+}
+
+export async function setRiderActive(id: string, active: boolean): Promise<Rider> {
+  const res = await vendorFetch(
+    `/riders/${encodeURIComponent(id)}/${active ? "activate" : "deactivate"}`,
+    { method: "POST" },
+  );
+  if (!res.ok) throw new Error(`POST rider ${active ? "activate" : "deactivate"} failed: ${res.status}`);
   return res.json();
 }
 
@@ -433,18 +468,44 @@ export async function markDeliveredByVendor(id: string): Promise<VendorOrder> {
 // Vendor accounts (real sign-in, ahead of first deploy — replaces the
 // earlier plan for a shared passcode).
 
+// A rough sense of what the vendor sells (design: "What do you sell?").
+// Account context only — not shown to customers or riders, and no feature
+// logic depends on it yet.
+export type VendorCategory =
+  | "retail_ecommerce"
+  | "food_restaurant"
+  | "pharmacy"
+  | "delivery_logistics"
+  | "other";
+
+export const VENDOR_CATEGORY_LABELS: Record<VendorCategory, string> = {
+  retail_ecommerce: "Retail / e-commerce",
+  food_restaurant: "Food or restaurant",
+  pharmacy: "Pharmacy",
+  delivery_logistics: "Delivery / logistics / dispatch company",
+  other: "Other",
+};
+
 export type Vendor = {
   id: string;
   businessName: string;
-  businessAddress: string | null;
+  businessAddress: string;
   businessPhone: string | null;
+  logoUrl: string | null;
+  ownerName: string;
+  category: VendorCategory;
   email: string;
 };
 
 export type SignUpInput = {
   businessName: string;
-  businessAddress?: string;
+  // The rider's pickup point — required, not just context.
+  businessAddress: string;
   businessPhone?: string;
+  // A small "data:image/..." string from the logo picker, if one was set.
+  logoDataUrl?: string;
+  ownerName: string;
+  category: VendorCategory | "";
   email: string;
   password: string;
 };
@@ -492,4 +553,49 @@ export async function getMe(): Promise<Vendor | null> {
   if (res.status === 401) return null;
   if (!res.ok) throw new Error(`GET me failed: ${res.status}`);
   return res.json();
+}
+
+// The "Edit Profile" form (design: "Vendor: Settings"). Only the fields
+// present are changed; businessPhone/logoDataUrl clear to null when sent
+// as "".
+export type UpdateVendorInput = Partial<{
+  businessName: string;
+  businessAddress: string;
+  businessPhone: string;
+  logoDataUrl: string;
+  ownerName: string;
+  category: VendorCategory;
+}>;
+
+export async function updateVendorProfile(input: UpdateVendorInput): Promise<Vendor> {
+  const res = await vendorFetch("/auth/me", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 400) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`PATCH auth/me failed: ${res.status}`);
+  return res.json();
+}
+
+// Plain fetch, not vendorFetch: a 401 here means "wrong current password",
+// a form error to show inline — not "no session", which would wrongly send
+// the browser to the login page (the same reasoning as signUp/logIn above).
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const res = await fetch(`${API_URL}/auth/change-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (res.status === 400 || res.status === 401) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`POST change-password failed: ${res.status}`);
 }

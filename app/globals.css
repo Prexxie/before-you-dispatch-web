@@ -106,6 +106,121 @@ body {
     margin: 0 auto;
   }
 
+  /* Auth pages (Vendor: Sign Up / Log In / Set Up Workspace) */
+  .auth-page {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+  }
+  .auth-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--ink);
+    justify-content: center;
+    margin-bottom: 28px;
+  }
+  .auth-card {
+    width: 420px;
+    max-width: 100%;
+  }
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0;
+    color: var(--ink-faint);
+    font-size: 12.5px;
+  }
+  .divider::before,
+  .divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .auth-foot {
+    text-align: center;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    margin-top: 22px;
+  }
+  .auth-foot a {
+    color: var(--brand);
+    font-weight: 700;
+    text-decoration: none;
+  }
+  .readonly-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .readonly-row:last-child {
+    border-bottom: none;
+    margin-bottom: 20px;
+  }
+  .readonly-label {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+  .readonly-val {
+    font-size: 14px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .settings-grid {
+    display: grid;
+    gap: 20px;
+    max-width: 640px;
+  }
+  .logo-upload {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .logo-circle {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: var(--brand-tint);
+    border: 2px dashed #86c4aa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--brand-dark);
+    margin-bottom: 10px;
+    position: relative;
+    padding: 0;
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .logo-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .logo-circle .cam {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+  }
+
   /* Type */
   .eyebrow {
     font-size: 12px;
@@ -583,6 +698,22 @@ body {
     font-weight: 700;
     flex-shrink: 0;
   }
+  .pin-box {
+    background:
+      radial-gradient(circle at 30% 30%, #d5efe3 0, transparent 45%),
+      var(--brand-tint);
+    border: 1.5px dashed #86c4aa;
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--brand-dark);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+  }
 
   /* Rider: Mark Outcome */
   .outcome-btn {
@@ -640,6 +771,12 @@ body {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    overflow: hidden;
+  }
+  .vendor-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
   .vendor-strip strong {
     display: block;
@@ -952,6 +1089,12 @@ body {
     font-weight: 700;
     font-size: 16px;
     flex-shrink: 0;
+    overflow: hidden;
+  }
+  .biz-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
   .stat-row {
     display: grid;
@@ -1032,6 +1175,19 @@ body {
   .table-scroll {
     overflow-x: auto;
   }
+  .split-riders {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+  /* Grid items default to min-width: auto, which lets an oversized child
+     (a wide table) grow the track past the card's edge instead of
+     scrolling inside it. min-width: 0 lets the card shrink to the track
+     and hand overflow to .table-scroll instead. */
+  .split-riders > .card {
+    min-width: 0;
+  }
   table.wire {
     width: 100%;
     border-collapse: collapse;
@@ -1093,6 +1249,9 @@ body {
     .stat-row {
       grid-template-columns: repeat(2, 1fr);
     }
+    .split-riders {
+      grid-template-columns: 1fr;
+    }
   }
 
   /* Phones: the vendor pages are designed at desktop width. */
@@ -1111,6 +1270,295 @@ body {
     }
     .row-flex {
       flex-direction: column;
+    }
+  }
+
+  /* Landing page (design: "Landing Page"). Public and mobile-first, unlike
+     the vendor pages above. */
+  .lp-nav {
+    height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 64px;
+    background: #ffffff;
+    border-bottom: 1px solid var(--border);
+  }
+  .lp-nav-links {
+    display: flex;
+    gap: 32px;
+    align-items: center;
+  }
+  .lp-nav-links a {
+    color: var(--ink-soft);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .lp-nav-links a.btn {
+    font-size: 14.5px;
+  }
+  .lp-nav-links a.btn-primary {
+    color: #ffffff;
+  }
+  .lp-nav-links a.btn-secondary {
+    color: var(--brand-dark);
+  }
+  .lp-hero {
+    display: flex;
+    align-items: center;
+    gap: 64px;
+    padding: 88px 64px 96px 64px;
+    background: linear-gradient(180deg, #faf9f6 0%, #f4f8f6 100%);
+  }
+  .lp-hero-copy {
+    flex: 1.1;
+  }
+  .lp-hero-visual {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+  }
+  .lp-h1 {
+    font-size: 46px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.12;
+    margin: 0 0 20px 0;
+    letter-spacing: -0.02em;
+  }
+  .lp-h1 em {
+    color: var(--brand);
+    font-style: normal;
+  }
+  .lp-lead {
+    font-size: 17px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+    margin: 0 0 32px 0;
+    max-width: 480px;
+  }
+  .lp-cta-row {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+  }
+  .lp-stats {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+  .lp-stat-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--ink);
+    font-family: "Fraunces", serif;
+  }
+  .lp-stat-label {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+  .lp-mock {
+    width: 300px;
+    max-width: 100%;
+    background: #ffffff;
+    border-radius: 22px;
+    border: 1px solid var(--border);
+    box-shadow:
+      0 30px 60px -20px rgba(28, 25, 23, 0.18),
+      0 8px 20px -8px rgba(28, 25, 23, 0.1);
+    padding: 22px;
+    position: relative;
+  }
+  .lp-mock-badge {
+    position: absolute;
+    top: -14px;
+    right: -14px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    box-shadow: 0 4px 10px -2px rgba(159, 18, 57, 0.35);
+  }
+  .lp-section {
+    padding: 88px 64px;
+  }
+  .lp-section-head {
+    text-align: center;
+    max-width: 620px;
+    margin: 0 auto 56px auto;
+  }
+  .lp-h2 {
+    font-size: 30px;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 12px 0;
+  }
+  .lp-features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+  }
+  .lp-feature {
+    padding: 32px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: #ffffff;
+  }
+  .lp-feature-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: var(--brand-tint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--brand-dark);
+    margin-bottom: 18px;
+  }
+  .lp-feature h3 {
+    font-size: 16.5px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 8px 0;
+    font-family: "Manrope", sans-serif;
+  }
+  .lp-feature p {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+    margin: 0;
+  }
+  .lp-steps {
+    background: var(--brand-dark);
+    border-radius: 24px;
+    padding: 56px 64px;
+    display: flex;
+    gap: 24px;
+  }
+  .lp-step {
+    flex: 1;
+    color: #ffffff;
+  }
+  .lp-step-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .lp-step h4 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0 0 6px 0;
+    font-family: "Manrope", sans-serif;
+  }
+  .lp-step p {
+    font-size: 13px;
+    color: #c9d6cf;
+    line-height: 1.55;
+    margin: 0;
+  }
+  .lp-cta-band {
+    margin: 0 64px 88px 64px;
+    background: var(--brand);
+    border-radius: 24px;
+    padding: 56px 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+  .lp-cta-band h3 {
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+  }
+  .lp-cta-band p {
+    color: #d5efe3;
+    font-size: 14px;
+    margin: 0;
+  }
+  .lp-footer {
+    padding: 40px 64px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .lp-footer-links {
+    display: flex;
+    gap: 28px;
+  }
+  .lp-footer-links span {
+    color: var(--ink-faint);
+    font-size: 13px;
+  }
+
+  @media (max-width: 900px) {
+    .lp-nav {
+      padding: 0 24px;
+    }
+    .lp-nav-links {
+      gap: 16px;
+    }
+    .lp-nav-links a:not(.btn) {
+      display: none;
+    }
+    .lp-hero {
+      flex-direction: column;
+      padding: 56px 24px 64px 24px;
+      gap: 40px;
+      text-align: center;
+    }
+    .lp-hero-copy {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .lp-lead {
+      max-width: none;
+    }
+    .lp-cta-row,
+    .lp-stats {
+      justify-content: center;
+    }
+    .lp-h1 {
+      font-size: 34px;
+    }
+    .lp-section {
+      padding: 56px 24px;
+    }
+    .lp-features {
+      grid-template-columns: 1fr;
+    }
+    .lp-steps {
+      flex-direction: column;
+      padding: 32px 24px;
+    }
+    .lp-cta-band {
+      margin: 0 24px 56px 24px;
+      padding: 40px 24px;
+      text-align: center;
+      justify-content: center;
+    }
+    .lp-footer {
+      padding: 32px 24px;
+      flex-direction: column;
+      text-align: center;
     }
   }
 }

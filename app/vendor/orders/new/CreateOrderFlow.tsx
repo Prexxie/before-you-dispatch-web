@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import {
@@ -68,7 +69,7 @@ export default function CreateOrderFlow() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   function loadRiders() {
-    getRiders()
+    getRiders({ activeOnly: true })
       .then((list) => setRiders({ kind: "ready", riders: list }))
       .catch(() => setRiders({ kind: "error" }));
   }
@@ -197,7 +198,8 @@ export default function CreateOrderFlow() {
           </p>
         ) : noRiders ? (
           <p className="sub" style={{ marginBottom: 22 }}>
-            You don&apos;t have any riders yet. Add a rider before creating a
+            You don&apos;t have any riders yet.{" "}
+            <Link href="/vendor/riders">Add a rider</Link> before creating a
             delivery.
           </p>
         ) : (

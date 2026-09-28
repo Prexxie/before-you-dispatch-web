@@ -1,19 +1,20 @@
 import { ReactNode } from "react";
 import { LogoMark } from "./icons";
 
-// Same topbar + narrow content column as VendorShell, but without the
-// Dashboard link — these pages are for a vendor who isn't signed in yet.
+// Design: "Vendor: Sign Up" / "Vendor: Log In" / "Vendor: Set Up Workspace".
+// A centered logo lockup above a narrow card — no topbar, since these pages
+// are for a vendor who isn't signed in (or mid-signup) yet.
 export default function AuthShell({ children }: { children: ReactNode }) {
   return (
     <div className="page">
-      <header className="topbar">
-        <span className="wordmark">
-          <LogoMark />
-          Before You Dispatch
-        </span>
-      </header>
-      <main className="content vendor">
-        <div className="content-narrow">{children}</div>
+      <main className="content auth-page">
+        <div className="auth-card">
+          <div className="auth-logo">
+            <LogoMark />
+            Before You Dispatch
+          </div>
+          {children}
+        </div>
       </main>
     </div>
   );
