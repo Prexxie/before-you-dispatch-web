@@ -1,25 +1,37 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ConflictError,
   FAILURE_REASON_LABELS,
   FailureReason,
-  NotFoundError,
   RiderJob,
+  confirmPickup,
   getRiderJob,
   submitOutcome,
 } from "@/lib/api";
-import { directionsLink } from "@/lib/links";
+import { useLiveData } from "@/lib/useLiveData";
+import { formatTime } from "@/lib/time";
+import {
+  directionsLink,
+  directionsLinkToAddress,
+  displayPhone,
+  firstName,
+  telLink,
+} from "@/lib/links";
 import PhoneScreen, { ResultScreen, asSentenceStart } from "@/components/PhoneScreen";
+import { VendorContact } from "@/components/VendorStrip";
 import {
   AlertIcon,
   BackIcon,
   CheckIcon,
+  ClockIcon,
   CrossIcon,
   DirectionsIcon,
+  LockIcon,
   LogoMark,
+  NextStopIcon,
   NoteIcon,
   PackageIcon,
 } from "@/components/icons";
@@ -30,20 +42,6 @@ const PinMap = dynamic(() => import("@/components/PinMap"), {
   loading: () => null,
 });
 
-type View =
-  | { kind: "loading" }
-  | { kind: "invalid" }
-  | { kind: "error" }
-  | { kind: "ready"; job: RiderJob };
-
-async function fetchView(token: string): Promise<View> {
-  try {
-    return { kind: "ready", job: await getRiderJob(token) };
-  } catch (err) {
-    return { kind: err instanceof NotFoundError ? "invalid" : "error" };
-  }
-}
-
 function initials(name: string): string {
   return name
     .trim()
@@ -53,24 +51,14 @@ function initials(name: string): string {
     .join("");
 }
 
+const finished = (job: RiderJob) =>
+  job.status === "delivered" || job.status === "failed";
+
 export default function RiderFlow({ token }: { token: string }) {
-  const [view, setView] = useState<View>({ kind: "loading" });
-  const [marking, setMarking] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchView(token).then((next) => {
-      if (!cancelled) setView(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
-
-  function reload() {
-    setView({ kind: "loading" });
-    fetchView(token).then(setView);
-  }
+  // Refreshes so "I've Picked Up the Order" and "Mark Delivery Completed"
+  // unlock by themselves as the rider and customer act.
+  const [view, setJob] = useLiveData(() => getRiderJob(token), token, finished);
+  const [failing, setFailing] = useState(false);
 
   if (view.kind === "loading") {
     return (
@@ -82,7 +70,7 @@ export default function RiderFlow({ token }: { token: string }) {
       </PhoneScreen>
     );
   }
-  if (view.kind === "invalid") {
+  if (view.kind === "missing") {
     return (
       <ResultScreen
         icon={<AlertIcon />}
@@ -100,56 +88,183 @@ export default function RiderFlow({ token }: { token: string }) {
         tone="neutral"
         eyebrow="Connection problem"
         title="We couldn't load this delivery"
-        sub="Check your internet connection and try again."
-      >
-        <button onClick={reload} className="btn btn-secondary btn-block">
-          Try again
-        </button>
-      </ResultScreen>
-    );
-  }
-
-  const { job } = view;
-  if (job.status === "delivered" || job.status === "failed") {
-    return <DoneScreen job={job} />;
-  }
-  if (marking) {
-    return (
-      <OutcomeScreen
-        token={token}
-        job={job}
-        onBack={() => setMarking(false)}
-        onDone={(status, failureReason) =>
-          setView({ kind: "ready", job: { ...job, status, failureReason } })
-        }
-        onStale={reload}
+        sub="Check your internet connection. This page will keep trying."
       />
     );
   }
-  return <JobScreen job={job} onMark={() => setMarking(true)} />;
+
+  const job = view.data;
+  if (finished(job)) return <DoneScreen job={job} />;
+
+  if (job.status !== "dispatched") {
+    return (
+      <PhoneScreen centered>
+        <LogoMark size={20} className="mb-7 block" />
+        <p className="eyebrow">Order #{job.orderNumber}</p>
+        <h1 className="h1">Not sent out yet</h1>
+        <p className="sub">
+          {job.vendor?.name ?? "The business"} hasn&apos;t sent this delivery
+          out yet. This page will update by itself once they do.
+        </p>
+      </PhoneScreen>
+    );
+  }
+  if (job.receivedAt) {
+    return <CompleteScreen token={token} job={job} onChange={setJob} />;
+  }
+  if (failing) {
+    return (
+      <CouldntDeliverScreen
+        token={token}
+        job={job}
+        onBack={() => setFailing(false)}
+        onChange={setJob}
+      />
+    );
+  }
+  if (!job.pickedUpAt || !job.location) {
+    return <PickupScreen token={token} job={job} onChange={setJob} />;
+  }
+  return <EnRouteScreen job={job} location={job.location} onCouldntDeliver={() => setFailing(true)} />;
 }
 
-// Design: "Rider: Assigned Delivery"
-function JobScreen({ job, onMark }: { job: RiderJob; onMark: () => void }) {
-  const { lat, lng, landmarkNote } = job.location;
+// Design: "Rider: Assigned Delivery" (pickup leg only; the customer's pin
+// stays hidden — by the API, not just the UI — until pickup is confirmed).
+function PickupScreen({
+  token,
+  job,
+  onChange,
+}: {
+  token: string;
+  job: RiderJob;
+  onChange: (job: RiderJob) => void;
+}) {
+  const customer = firstName(job.customerName);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pickedUp() {
+    setConfirming(true);
+    setError(null);
+    try {
+      const result = await confirmPickup(token);
+      onChange({ ...job, pickedUpAt: result.pickedUpAt, location: result.location });
+    } catch (err) {
+      setError(
+        err instanceof ConflictError
+          ? err.message
+          : "That didn't go through. Check your connection and try again.",
+      );
+    } finally {
+      setConfirming(false);
+    }
+  }
+
   return (
     <PhoneScreen>
-      <p className="eyebrow">New Job</p>
+      <p className="eyebrow">New Job &middot; Order #{job.orderNumber}</p>
       <h1 className="h1">Delivery assigned to you</h1>
+      <p className="sub">
+        Head to the pickup point below. Once you have the items, confirm
+        pickup to unlock the customer&apos;s pin.
+      </p>
 
       <div className="card" style={{ marginBottom: 18, padding: 24 }}>
-        <div className="mb-4 flex items-center gap-2.5">
+        {job.vendor && (
+          <>
+            <div className="leg">
+              <span
+                className="avatar"
+                style={{ width: 36, height: 36, fontSize: 13, background: "#FDF2F4", color: "#9F1239" }}
+              >
+                {initials(job.vendor.name)}
+              </span>
+              <div>
+                <div className="leg-label">Pick up from</div>
+                <div className="leg-name">{job.vendor.name}</div>
+                <div className="leg-meta">
+                  <VendorContact vendor={job.vendor} />
+                </div>
+              </div>
+            </div>
+            <div className="leg-divider" />
+          </>
+        )}
+        <p className="field-label">
+          <PackageIcon />
+          Item to collect
+        </p>
+        <div className="text-[14.5px] text-ink mb-4">{job.itemDescription}</div>
+        <div className="next-leg">
+          <NextStopIcon />
+          <span>
+            Then deliver to <strong>{job.customerName}</strong> &middot; pin
+            shown after pickup
+          </span>
+        </div>
+      </div>
+
+      {job.vendor?.address && (
+        <a
+          href={directionsLinkToAddress(job.vendor.address)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-secondary btn-block mb-3"
+        >
+          <DirectionsIcon />
+          Get Directions to Pickup
+        </a>
+      )}
+      <button onClick={pickedUp} disabled={confirming} className="btn btn-primary btn-block">
+        {confirming ? "Confirming…" : "I've Picked Up the Order"}
+      </button>
+      {error && (
+        <p className="mt-3 text-sm font-semibold text-danger" role="alert">
+          {error}
+        </p>
+      )}
+      <p className="caption">
+        Waiting on {customer}? Their pin appears here the moment you confirm.
+      </p>
+    </PhoneScreen>
+  );
+}
+
+// Design: "Rider: Heading to Customer" (post-pickup, pre-receipt).
+function EnRouteScreen({
+  job,
+  location,
+  onCouldntDeliver,
+}: {
+  job: RiderJob;
+  location: NonNullable<RiderJob["location"]>;
+  onCouldntDeliver: () => void;
+}) {
+  const { lat, lng, landmarkNote } = location;
+  const customer = firstName(job.customerName);
+  return (
+    <PhoneScreen>
+      <p className="eyebrow">Order #{job.orderNumber}</p>
+      <span className="badge badge-success pickup-badge">
+        <CheckIcon size={10} />
+        Picked up &middot; {formatTime(job.pickedUpAt!)}
+      </span>
+      <h1 className="h1">Heading to {customer}</h1>
+      <p className="sub">
+        You have the items. Use the pin and landmark note below to find them.
+      </p>
+
+      <div className="card" style={{ marginBottom: 18, padding: 24 }}>
+        <div className="leg mb-4">
           <span className="avatar" style={{ width: 36, height: 36, fontSize: 13 }}>
             {initials(job.customerName)}
           </span>
           <div>
-            <div className="text-[14.5px] font-bold text-ink">{job.customerName}</div>
-            <a
-              href={`tel:${job.customerPhone.replace(/\s/g, "")}`}
-              className="text-[12.5px] text-ink-soft"
-            >
-              {job.customerPhone}
-            </a>
+            <div className="leg-label">Deliver to</div>
+            <div className="leg-name">{job.customerName}</div>
+            <div className="leg-meta">
+              <a href={telLink(job.customerPhone)}>{displayPhone(job.customerPhone)}</a>
+            </div>
           </div>
         </div>
         <p className="field-label">
@@ -194,57 +309,118 @@ function JobScreen({ job, onMark }: { job: RiderJob; onMark: () => void }) {
         <DirectionsIcon />
         Get Directions
       </a>
-      {job.status === "dispatched" && (
-        <button onClick={onMark} className="btn btn-primary btn-block mt-3">
-          Mark this delivery
-        </button>
-      )}
+
+      <div className="wait-strip" role="status">
+        <ClockIcon />
+        <span>
+          Hand over the items, then ask {customer} to tap{" "}
+          <strong>&ldquo;I&apos;ve received my delivery&rdquo;</strong> on
+          their link. You can complete the delivery once they do.
+        </span>
+      </div>
+      <button className="btn btn-locked btn-block" disabled>
+        <LockIcon />
+        Mark Delivery Completed
+      </button>
+      <button type="button" onClick={onCouldntDeliver} className="text-link">
+        Couldn&apos;t deliver?
+      </button>
     </PhoneScreen>
   );
 }
 
-// Design: "Rider: Mark Outcome"
-function OutcomeScreen({
+// Design: "Rider: Customer Confirmed Receipt"
+function CompleteScreen({
+  token,
+  job,
+  onChange,
+}: {
+  token: string;
+  job: RiderJob;
+  onChange: (job: RiderJob) => void;
+}) {
+  const customer = firstName(job.customerName);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function complete() {
+    setSending(true);
+    setError(null);
+    try {
+      const result = await submitOutcome(token, { outcome: "delivered" });
+      onChange({ ...job, status: result.status, failureReason: null });
+    } catch (err) {
+      if (err instanceof ConflictError && (err.status === "delivered" || err.status === "failed")) {
+        onChange({ ...job, status: err.status });
+      } else {
+        setError(
+          err instanceof ConflictError
+            ? err.message
+            : "That didn't go through. Check your connection and try again.",
+        );
+      }
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <ResultScreen
+      icon={<CheckIcon />}
+      tone="brand"
+      eyebrow={`Order #${job.orderNumber}`}
+      title={`${customer} has their delivery`}
+      sub={`They tapped "I've received my delivery" at ${formatTime(job.receivedAt!)}. Mark it completed to finish the job.`}
+    >
+      <Summary job={job} badge={["badge-success", "Received by customer"]} />
+      <button onClick={complete} disabled={sending} className="btn btn-complete btn-block">
+        <CheckIcon size={16} />
+        {sending ? "Completing…" : "Mark Delivery Completed"}
+      </button>
+      {error && (
+        <p className="mt-4 text-sm font-semibold text-danger" role="alert">
+          {error}
+        </p>
+      )}
+    </ResultScreen>
+  );
+}
+
+// Design: "Rider: Couldn't Deliver"
+function CouldntDeliverScreen({
   token,
   job,
   onBack,
-  onDone,
-  onStale,
+  onChange,
 }: {
   token: string;
   job: RiderJob;
   onBack: () => void;
-  onDone: (status: "delivered" | "failed", reason: FailureReason | null) => void;
-  onStale: () => void;
+  onChange: (job: RiderJob) => void;
 }) {
+  const customer = firstName(job.customerName);
+  const vendor = job.vendor?.name ?? "the business";
   const [reason, setReason] = useState<FailureReason | "">("");
   const [needReason, setNeedReason] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function mark(outcome: "delivered" | "failed") {
+  async function markFailed() {
     setError(null);
-    if (outcome === "failed" && reason === "") {
+    if (reason === "") {
       setNeedReason(true);
       return;
     }
     setSending(true);
     try {
-      const result = await submitOutcome(
-        token,
-        outcome === "delivered"
-          ? { outcome }
-          : { outcome, reason: reason as FailureReason },
-      );
-      onDone(result.status as "delivered" | "failed", result.failureReason);
+      const result = await submitOutcome(token, { outcome: "failed", reason });
+      onChange({ ...job, status: result.status, failureReason: result.failureReason });
     } catch (err) {
-      if (err instanceof ConflictError) {
-        // Already marked (e.g. from another phone): show what's recorded.
-        if (err.status === "delivered" || err.status === "failed") onStale();
-        else setError(err.message);
-      } else {
-        setError("That didn't go through. Check your connection and try again.");
-      }
+      setError(
+        err instanceof ConflictError
+          ? err.message
+          : "That didn't go through. Check your connection and try again.",
+      );
     } finally {
       setSending(false);
     }
@@ -253,31 +429,15 @@ function OutcomeScreen({
   return (
     <PhoneScreen>
       <p className="eyebrow">Order #{job.orderNumber}</p>
-      <h1 className="h1">Mark this delivery</h1>
+      <h1 className="h1">Couldn&apos;t deliver?</h1>
       <p className="sub">
-        {job.customerName} &middot; {job.itemDescription}
+        {job.customerName} &middot; {job.itemDescription}. Tell {vendor} what
+        went wrong.
       </p>
 
-      <button
-        className="outcome-btn outcome-delivered"
-        onClick={() => mark("delivered")}
-        disabled={sending}
-      >
-        <CheckIcon size={16} />
-        Delivered
-      </button>
-      <button
-        className="outcome-btn outcome-failed"
-        onClick={() => mark("failed")}
-        disabled={sending}
-      >
-        <CrossIcon />
-        Failed / Couldn&apos;t deliver
-      </button>
-
-      <div className="card" style={{ marginTop: 8 }}>
+      <div className="card" style={{ marginBottom: 18 }}>
         <label className="field-label" htmlFor="reason">
-          If failed, reason
+          Reason
         </label>
         <select
           id="reason"
@@ -300,16 +460,32 @@ function OutcomeScreen({
         </select>
         {needReason && (
           <p id="reason-error" className="field-error" style={{ margin: "8px 0 0" }}>
-            Choose a reason, then tap Failed again.
+            Choose a reason first.
           </p>
         )}
       </div>
 
+      <button className="outcome-btn outcome-failed" onClick={markFailed} disabled={sending}>
+        <CrossIcon />
+        {sending ? "Saving…" : "Mark as Failed"}
+      </button>
       {error && (
-        <p className="mt-4 text-sm font-semibold text-danger" role="alert">
+        <p className="mt-1 text-sm font-semibold text-danger" role="alert">
           {error}
         </p>
       )}
+      <p className="mt-4 text-[13px] leading-normal text-ink-soft">
+        Handed it over but {customer} can&apos;t confirm? Call {vendor}
+        {job.vendor?.phone && (
+          <>
+            {" "}on{" "}
+            <a className="font-bold text-brand" href={telLink(job.vendor.phone)}>
+              {displayPhone(job.vendor.phone)}
+            </a>
+          </>
+        )}
+        . They can mark it delivered for you.
+      </p>
       <button onClick={onBack} className="tag-back mt-5">
         <BackIcon />
         Back to delivery details
@@ -319,15 +495,19 @@ function OutcomeScreen({
 }
 
 function DoneScreen({ job }: { job: RiderJob }) {
-  const vendor = job.vendorName ?? "The business";
+  const vendor = job.vendor?.name ?? "The business";
   if (job.status === "delivered") {
     return (
       <ResultScreen
         icon={<CheckIcon />}
         tone="brand"
         eyebrow={`Order #${job.orderNumber}`}
-        title="Marked as delivered"
-        sub={`Thanks, ${job.riderName.split(/\s+/)[0]}. ${vendor} can see it on their dashboard.`}
+        title="Delivery completed"
+        sub={
+          job.deliveryConfirmedBy === "vendor"
+            ? `${vendor} marked this delivered for the customer.`
+            : `Thanks, ${firstName(job.riderName)}. ${vendor} can see it on their dashboard.`
+        }
       >
         <Summary job={job} badge={["badge-success", "Delivered"]} />
       </ResultScreen>
@@ -359,6 +539,12 @@ function Summary({ job, badge }: { job: RiderJob; badge: [string, string] }) {
         <span className="summary-label">Customer</span>
         <span className="summary-val">{job.customerName}</span>
       </div>
+      {job.vendor && (
+        <div className="summary-row">
+          <span className="summary-label">From</span>
+          <span className="summary-val">{job.vendor.name}</span>
+        </div>
+      )}
       <div className="summary-row">
         <span className="summary-label">Item</span>
         <span className="summary-val">{asSentenceStart(job.itemDescription)}</span>

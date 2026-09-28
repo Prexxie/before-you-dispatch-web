@@ -16,19 +16,36 @@ Stack: Next.js (App Router), TypeScript, Tailwind CSS. Talks to [before-you-disp
 git clone <repo-url> before-you-dispatch-web
 cd before-you-dispatch-web
 yarn install
-cp .env.local.example .env.local   # point NEXT_PUBLIC_API_URL at the API
+cp .env.local.example .env.local   # point API_URL at the API
 yarn dev
 ```
 
-Open http://localhost:3000. The API's `CORS_ORIGIN` must include this origin.
+Open http://localhost:3000.
+
+The browser never calls the API directly: it calls `/api/...` on this app, and `next.config.ts` forwards those requests to `API_URL`. So the app and the API share one address (no CORS in the browser, one tunnel for phone testing).
+
+## Test on a real phone (ngrok)
+
+Phones only share their location with `https://` pages, so test the customer and rider pages through an ngrok tunnel:
+
+```bash
+# with the API (yarn dev in before-you-dispatch-api) and this app (yarn dev) running
+ngrok http 3000
+```
+
+Open the `https://….ngrok-free.app` address ngrok prints, on your laptop, and create orders from there: the customer and rider links are built from the address you're on, so they'll use the tunnel too. Send a link to your phone and open it. ngrok's free plan shows a one-time "You are about to visit" page first; tap **Visit Site**.
+
+Stop the tunnel (Ctrl+C) when you're done: while it runs, anyone with the address can reach your local app.
 
 ## Routes
 
-| Route              | Who       | What                                     |
-| ------------------ | --------- | ---------------------------------------- |
-| `/vendor`          | Vendor    | Create order form and delivery dashboard |
-| `/confirm/[token]` | Customer  | "Are you ready?", then pin and landmark  |
-| `/rider/[token]`   | Rider     | Delivery details and outcome             |
+| Route                 | Who      | What                                         |
+| --------------------- | -------- | -------------------------------------------- |
+| `/vendor`             | Vendor   | Dashboard of today's orders                  |
+| `/vendor/orders/new`  | Vendor   | Create order form                            |
+| `/vendor/orders/[id]` | Vendor   | One order: customer link, then rider link    |
+| `/confirm/[token]`    | Customer | "Are you ready?", then pin and landmark      |
+| `/rider/[token]`      | Rider    | Delivery details and outcome                 |
 
 ## Scripts
 
@@ -41,6 +58,6 @@ Open http://localhost:3000. The API's `CORS_ORIGIN` must include this origin.
 
 ## Environment variables
 
-| Variable              | Purpose                                                     |
-| --------------------- | ----------------------------------------------------------- |
-| `NEXT_PUBLIC_API_URL` | Base URL of the API, e.g. `http://localhost:4000` locally   |
+| Variable  | Purpose                                                                                        |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| `API_URL` | Base URL of the API, e.g. `http://localhost:4000` locally. Server-side only (read by `next.config.ts`). The old name `NEXT_PUBLIC_API_URL` still works. |

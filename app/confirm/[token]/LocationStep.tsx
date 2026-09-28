@@ -257,7 +257,7 @@ function PinEditor({
           <span>
             Welcome back, {details.customerFirstName}. We loaded the pin and
             note from your last order
-            {details.vendorName ? ` with ${details.vendorName}` : ""}. Drag
+            {details.vendor ? ` with ${details.vendor.name}` : ""}. Drag
             the pin if you&apos;re somewhere else today.
           </span>
         </div>

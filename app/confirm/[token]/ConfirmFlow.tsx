@@ -3,11 +3,14 @@
 import { ReactNode, useEffect, useState } from "react";
 import {
   ConfirmationDetails,
+  ConflictError,
   NotFoundError,
   OrderStatus,
+  confirmReceived,
   getConfirmation,
   submitConfirmation,
 } from "@/lib/api";
+import { displayPhone, firstName, telLink } from "@/lib/links";
 import {
   AlertIcon,
   CheckIcon,
@@ -20,6 +23,7 @@ import PhoneScreen, {
   Tone,
   asSentenceStart,
 } from "@/components/PhoneScreen";
+import VendorStrip, { VendorContact } from "@/components/VendorStrip";
 import LocationStep from "./LocationStep";
 
 type View =
@@ -40,6 +44,8 @@ export default function ConfirmFlow({ token }: { token: string }) {
   const [view, setView] = useState<View>({ kind: "loading" });
   const [submitting, setSubmitting] = useState<boolean | null>(null);
   const [submitError, setSubmitError] = useState(false);
+  const [receiving, setReceiving] = useState(false);
+  const [receiveError, setReceiveError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +80,23 @@ export default function ConfirmFlow({ token }: { token: string }) {
       else setSubmitError(true);
     } finally {
       setSubmitting(null);
+    }
+  }
+
+  // "I've received my delivery" (CLAUDE.md flow step 6).
+  async function received() {
+    setReceiving(true);
+    setReceiveError(null);
+    try {
+      await confirmReceived(token);
+      const next = await fetchView(token);
+      if (next.kind === "ready") setView(next);
+    } catch (err) {
+      if (err instanceof NotFoundError) setView({ kind: "invalid" });
+      else if (err instanceof ConflictError) setReceiveError(err.message);
+      else setReceiveError("That didn't go through. Check your connection and try again.");
+    } finally {
+      setReceiving(false);
     }
   }
 
@@ -117,7 +140,7 @@ export default function ConfirmFlow({ token }: { token: string }) {
   }
 
   const { details } = view;
-  const from = details.vendorName ? ` from ${details.vendorName}` : "";
+  const from = details.vendor ? ` from ${details.vendor.name}` : "";
 
   // Design: "Customer: Confirm Ready"
   if (details.status === "pending_confirmation") {
@@ -131,6 +154,7 @@ export default function ConfirmFlow({ token }: { token: string }) {
           {from}. Are you ready to receive it? We&apos;ll only send the rider
           once you confirm.
         </p>
+        <VendorStrip vendor={details.vendor} />
         <button
           onClick={() => answer(details, true)}
           disabled={submitting !== null}
@@ -165,9 +189,21 @@ export default function ConfirmFlow({ token }: { token: string }) {
       onReady={() => answer(details, true)}
       busy={submitting !== null}
       error={submitError}
+      onReceived={received}
+      receiving={receiving}
+      receiveError={receiveError}
     />
   );
 }
+
+type Screen = {
+  icon: ReactNode;
+  tone: Tone;
+  eyebrow: string;
+  title: string;
+  sub: string;
+  badge: [string, string];
+};
 
 // Everything after the customer's answer, except the map step.
 function StatusScreen({
@@ -175,26 +211,26 @@ function StatusScreen({
   onReady,
   busy,
   error,
+  onReceived,
+  receiving,
+  receiveError,
 }: {
   details: ConfirmationDetails;
   // "Actually, I'm ready" on the Not Now screen (same day only).
   onReady: () => void;
   busy: boolean;
   error: boolean;
+  // "I've received my delivery" on the On Its Way screen.
+  onReceived: () => void;
+  receiving: boolean;
+  receiveError: string | null;
 }) {
   const first = details.customerFirstName;
-  const vendor = details.vendorName ?? "the business";
-  const screens: Record<
-    Exclude<OrderStatus, "pending_confirmation" | "confirmed">,
-    {
-      icon: ReactNode;
-      tone: Tone;
-      eyebrow: string;
-      title: string;
-      sub: string;
-      badge: [string, string];
-    }
-  > = {
+  const vendor = details.vendor?.name ?? "the business";
+  const rider = details.rider ? firstName(details.rider.name) : "The rider";
+  const received = details.status === "dispatched" && details.receivedAt !== null;
+
+  const screens: Record<Exclude<OrderStatus, "pending_confirmation" | "confirmed">, Screen> = {
     // Design: "Customer: Not Now"
     not_ready: {
       icon: <MinusCircleIcon />,
@@ -204,12 +240,13 @@ function StatusScreen({
       sub: `We've let ${vendor} know you're not ready. They'll contact you directly about your order.`,
       badge: ["badge-neutral", "Not sent today"],
     },
+    // Design: "Customer: On Its Way"
     dispatched: {
       icon: <RiderIcon size={24} />,
       tone: "brand",
       eyebrow: `Hi ${first}`,
       title: "Your delivery is on its way",
-      sub: "The rider has your pin and landmark note, so they can find you without calling.",
+      sub: `${rider} has your pin and landmark note, so they can find you without calling.`,
       badge: ["badge-filled", "On its way"],
     },
     delivered: {
@@ -229,7 +266,17 @@ function StatusScreen({
       badge: ["badge-danger", "Not delivered"],
     },
   };
-  const s = screens[details.status as keyof typeof screens];
+  // Design: "Customer: Delivery Received"
+  const s: Screen = received
+    ? {
+        icon: <CheckIcon />,
+        tone: "brand",
+        eyebrow: `Thanks, ${first}`,
+        title: "Delivery received",
+        sub: `We've let ${vendor} know. ${rider} will now mark the delivery completed.`,
+        badge: ["badge-success", "Received"],
+      }
+    : screens[details.status as keyof typeof screens];
 
   return (
     <ResultScreen icon={s.icon} tone={s.tone} eyebrow={s.eyebrow} title={s.title} sub={s.sub}>
@@ -238,16 +285,26 @@ function StatusScreen({
           <span className="summary-label">Order</span>
           <span className="summary-val">{asSentenceStart(details.itemDescription)}</span>
         </div>
-        {details.vendorName && (
+        {details.vendor && (
           <div className="summary-row">
             <span className="summary-label">From</span>
-            <span className="summary-val">{details.vendorName}</span>
+            <span className="summary-val">
+              {details.vendor.name}
+              <small>
+                <VendorContact vendor={details.vendor} />
+              </small>
+            </span>
           </div>
         )}
-        {details.location && details.status !== "not_ready" && (
+        {details.status === "dispatched" && !received && details.rider && (
           <div className="summary-row">
-            <span className="summary-label">Landmark</span>
-            <span className="summary-val">{details.location.landmarkNote}</span>
+            <span className="summary-label">Rider</span>
+            <span className="summary-val">
+              {firstName(details.rider.name)}
+              <small>
+                <a href={telLink(details.rider.phone)}>{displayPhone(details.rider.phone)}</a>
+              </small>
+            </span>
           </div>
         )}
         <div className="summary-row">
@@ -255,6 +312,25 @@ function StatusScreen({
           <span className={`badge ${s.badge[0]}`}>{s.badge[1]}</span>
         </div>
       </div>
+
+      {details.status === "dispatched" && !received && (
+        <>
+          <button
+            onClick={onReceived}
+            disabled={receiving}
+            className="btn btn-primary btn-block"
+          >
+            {receiving ? "Sending…" : "I've Received My Delivery"}
+          </button>
+          <p className="caption">Tap this once the items are in your hands.</p>
+          {receiveError && (
+            <p className="mt-4 text-sm font-semibold text-danger" role="alert">
+              {receiveError}
+            </p>
+          )}
+        </>
+      )}
+
       {details.status === "not_ready" && details.canChangeToReady && (
         <>
           <p className="mb-2.5 text-center text-[13px] text-ink-soft">

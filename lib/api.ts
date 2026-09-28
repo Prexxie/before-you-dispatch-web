@@ -1,6 +1,7 @@
 // Client for before-you-dispatch-api. Shapes mirror the API repo's API.md.
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+// Same-origin path; next.config.ts forwards /api/* to the API (API_URL).
+const API_URL = "/api";
 
 export type OrderStatus =
   | "pending_confirmation"
@@ -24,7 +25,26 @@ export type ConfirmationDetails = {
   previousLocation: LocationInput | null;
   // They said "Not now" today and can still change to ready.
   canChangeToReady: boolean;
+  // Business the delivery is from (name, address, phone), or null.
+  vendor: VendorInfo | null;
+  // Who's bringing it, once the rider has been sent.
+  rider: { name: string; phone: string } | null;
+  // When the rider collected the order from the vendor.
+  pickedUpAt: string | null;
+  // When they tapped "I've received my delivery".
+  receivedAt: string | null;
 };
+
+// The business a delivery comes from. Until vendor accounts exist it comes
+// from the API's DEMO_VENDOR_* settings; address and phone may be missing.
+export type VendorInfo = {
+  name: string;
+  address: string | null;
+  phone: string | null;
+};
+
+// Who confirmed the customer got their items (CLAUDE.md flow step 6).
+export type DeliveryConfirmer = "customer" | "vendor";
 
 // Preset reasons a rider can give for a failed delivery.
 export type FailureReason =
@@ -81,27 +101,44 @@ export type VendorOrder = {
   itemDescription: string;
   status: OrderStatus;
   createdAt: string;
+  // Bumped by the database on every write; drives the dashboard's sort.
+  updatedAt: string;
   customerToken: string;
   rider: Rider;
   location: LocationInput | null;
   // Only set once the customer's pin is saved.
   riderToken: string | null;
+  confirmedAt: string | null;
+  notReadyAt: string | null;
+  locationSavedAt: string | null;
   dispatchedAt: string | null;
+  pickedUpAt: string | null;
+  receivedAt: string | null;
   completedAt: string | null;
   failureReason: FailureReason | null;
+  deliveryConfirmedBy: DeliveryConfirmer | null;
+  vendor: VendorInfo | null;
 };
 
-// What the rider's link shows (GET /rider/:token).
+// What the rider's link shows (GET /rider/:token). `location` is withheld by
+// the API (not just hidden in the UI) until the rider confirms pickup.
 export type RiderJob = {
   orderNumber: number;
   customerName: string;
   customerPhone: string;
   itemDescription: string;
-  location: LocationInput;
+  location: LocationInput | null;
   status: OrderStatus;
   failureReason: FailureReason | null;
   riderName: string;
   vendorName: string | null;
+  // The pickup point.
+  vendor: VendorInfo | null;
+  // Set once the rider confirms they collected the order.
+  pickedUpAt: string | null;
+  // Set once the customer confirms receipt; completing needs it.
+  receivedAt: string | null;
+  deliveryConfirmedBy: DeliveryConfirmer | null;
 };
 
 // A 409 from the API: the order is in a state that doesn't allow this.
@@ -254,6 +291,19 @@ export async function getRiderJob(token: string): Promise<RiderJob> {
   return res.json();
 }
 
+// The rider confirms they've collected the order from the vendor. Resolves
+// to the now-unlocked pin.
+export async function confirmPickup(
+  token: string,
+): Promise<{ pickedUpAt: string; location: LocationInput }> {
+  const res = await fetch(
+    `${API_URL}/rider/${encodeURIComponent(token)}/pickup`,
+    { method: "POST" },
+  );
+  if (!res.ok) return conflictOrThrow(res, "POST pickup");
+  return res.json();
+}
+
 export type Outcome =
   | { outcome: "delivered" }
   | { outcome: "failed"; reason: FailureReason };
@@ -271,5 +321,91 @@ export async function submitOutcome(
     },
   );
   if (!res.ok) return conflictOrThrow(res, "POST outcome");
+  return res.json();
+}
+
+// One row on the vendor dashboard (GET /orders).
+export type OrderSummary = {
+  id: string;
+  orderNumber: number;
+  customerName: string;
+  itemDescription: string;
+  riderName: string;
+  status: OrderStatus;
+  hasLocation: boolean;
+  pickedUpAt: string | null;
+  receivedAt: string | null;
+  failureReason: FailureReason | null;
+  deliveryConfirmedBy: DeliveryConfirmer | null;
+  createdAt: string;
+  // What the dashboard sorts by: most recently active first.
+  updatedAt: string;
+};
+
+// GET /orders response. Renamed in spirit from "TodayOrders": the list is
+// now every order, not just today's — only `today` stays today-scoped, for
+// the stat tiles.
+export type OrderList = {
+  vendorName: string | null;
+  vendor: VendorInfo | null;
+  // Today only (Nigeria time), for the four "today" stat tiles.
+  today: {
+    total: number;
+    awaitingConfirmation: number;
+    outForDelivery: number;
+    delivered: number;
+  };
+  // All-time per-status totals, for the filter chips. Unaffected by the
+  // current page or filter, so every chip always shows its true count.
+  counts: {
+    total: number;
+    awaitingConfirmation: number;
+    confirmed: number;
+    notReady: number;
+    outForDelivery: number;
+    delivered: number;
+    failed: number;
+  };
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  orders: OrderSummary[];
+};
+
+export async function getOrders(
+  opts: { status?: OrderStatus; page?: number } = {},
+): Promise<OrderList> {
+  const params = new URLSearchParams();
+  if (opts.status) params.set("status", opts.status);
+  if (opts.page && opts.page > 1) params.set("page", String(opts.page));
+  const qs = params.toString();
+  const res = await fetch(`${API_URL}/orders${qs ? `?${qs}` : ""}`, {
+    cache: "no-store",
+  });
+  if (res.status === 400) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`GET orders failed: ${res.status}`);
+  return res.json();
+}
+
+// The customer taps "I've received my delivery".
+export async function confirmReceived(token: string): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/orders/${encodeURIComponent(token)}/received`,
+    { method: "POST" },
+  );
+  if (!res.ok) return conflictOrThrow(res, "POST received");
+}
+
+// The vendor marks a dispatched order delivered for a customer who can't
+// confirm it themselves.
+export async function markDeliveredByVendor(id: string): Promise<VendorOrder> {
+  const res = await fetch(
+    `${API_URL}/orders/${encodeURIComponent(id)}/delivered`,
+    { method: "POST" },
+  );
+  if (!res.ok) return conflictOrThrow(res, "POST delivered");
   return res.json();
 }
