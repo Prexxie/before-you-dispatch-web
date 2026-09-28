@@ -4,18 +4,26 @@ import dynamic from "next/dynamic";
 import { FormEvent, useEffect, useState } from "react";
 import type { LatLng } from "@/components/PinMap";
 import {
+  ConfirmationDetails,
   LocationInput,
   LocationLockedError,
   NotFoundError,
   submitLocation,
 } from "@/lib/api";
+import {
+  CheckIcon,
+  HistoryIcon,
+  LocateIcon,
+  NoteIcon,
+  RiderIcon,
+  SearchIcon,
+} from "@/components/icons";
+import CustomerScreen, { ResultScreen, asSentenceStart } from "./CustomerScreen";
 
 // Leaflet touches `window` on import, so it can only load in the browser.
 const PinMap = dynamic(() => import("@/components/PinMap"), {
   ssr: false,
-  loading: () => (
-    <div className="h-72 w-full animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-800" />
-  ),
+  loading: () => null,
 });
 
 // Where the map starts if the phone won't share its location.
@@ -26,23 +34,100 @@ const NOTE_MAX_LENGTH = 200;
 
 type SearchResult = { display_name: string; lat: string; lon: string };
 
-type Props = {
-  token: string;
-  // Pin already saved for this order: show it, with the option to change it.
-  saved: LocationInput | null;
-  // Pin from the customer's earlier order: start the map there.
-  previous: LocationInput | null;
-};
+// Where the pin currently comes from, for the chip on the map.
+type PinSource = "current" | "saved" | null;
 
-export default function LocationStep({ token, saved, previous }: Props) {
-  const [savedLocation, setSavedLocation] = useState(saved);
-  const [editing, setEditing] = useState(saved === null);
-  const start = saved ?? previous;
+type Props = { token: string; details: ConfirmationDetails };
+
+export default function LocationStep({ token, details }: Props) {
+  const [savedLocation, setSavedLocation] = useState(details.location);
+  const [editing, setEditing] = useState(details.location === null);
+  const [locked, setLocked] = useState<string | null>(null);
+
+  if (locked) {
+    return (
+      <ResultScreen
+        icon={<RiderIcon size={24} />}
+        tone="brand"
+        eyebrow={`Hi ${details.customerFirstName}`}
+        title="Your rider is already on the way"
+        sub={locked}
+      />
+    );
+  }
+
+  if (!editing && savedLocation) {
+    return (
+      <ResultScreen
+        icon={<CheckIcon />}
+        tone="brand"
+        eyebrow={`All set, ${details.customerFirstName}`}
+        title="Your rider will find you"
+        sub="We'll send the rider with your pin and landmark note. You can still change them until the rider leaves."
+      >
+        <div className="summary">
+          <div className="summary-row">
+            <span className="summary-label">Order</span>
+            <span className="summary-val">{asSentenceStart(details.itemDescription)}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Landmark</span>
+            <span className="summary-val">{savedLocation.landmarkNote}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Status</span>
+            <span className="badge badge-success">Ready</span>
+          </div>
+        </div>
+        <button onClick={() => setEditing(true)} className="btn btn-secondary btn-block">
+          Change my pin
+        </button>
+      </ResultScreen>
+    );
+  }
+
+  return (
+    <PinEditor
+      token={token}
+      details={details}
+      current={savedLocation}
+      onSaved={(stored) => {
+        setSavedLocation(stored);
+        setEditing(false);
+      }}
+      onCancel={savedLocation ? () => setEditing(false) : undefined}
+      onLocked={setLocked}
+    />
+  );
+}
+
+function PinEditor({
+  token,
+  details,
+  current,
+  onSaved,
+  onCancel,
+  onLocked,
+}: {
+  token: string;
+  details: ConfirmationDetails;
+  // This order's saved pin, when the customer is changing it.
+  current: LocationInput | null;
+  onSaved: (stored: LocationInput) => void;
+  onCancel?: () => void;
+  onLocked: (message: string) => void;
+}) {
+  // The returning-customer design applies when the pin comes from an earlier
+  // order; changing this order's own pin reuses it with different copy.
+  const start = current ?? details.previousLocation;
+  const returning = current === null && details.previousLocation !== null;
 
   const [pin, setPin] = useState<LatLng>(
     start ? { lat: start.lat, lng: start.lng } : FALLBACK_CENTER,
   );
   const [recenterKey, setRecenterKey] = useState(0);
+  const [source, setSource] = useState<PinSource>(start ? "saved" : null);
+  const [showTip, setShowTip] = useState(start === null);
   // Only ever rendered client-side (after the customer confirms), so
   // navigator is available here. A known pin beats the phone's guess, so
   // only auto-locate when there isn't one.
@@ -60,11 +145,17 @@ export default function LocationStep({ token, saved, previous }: Props) {
   const [note, setNote] = useState(start?.landmarkNote ?? "");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [locked, setLocked] = useState(false);
 
   function moveTo(next: LatLng) {
     setPin(next);
     setRecenterKey((k) => k + 1);
+  }
+
+  // The customer placed the pin themselves (drag or tap).
+  function pinMoved(next: LatLng) {
+    setPin(next);
+    setSource(null);
+    setShowTip(false);
   }
 
   // State only changes in the callbacks, so this is safe to call from an effect.
@@ -72,6 +163,7 @@ export default function LocationStep({ token, saved, previous }: Props) {
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         moveTo({ lat: coords.latitude, lng: coords.longitude });
+        setSource("current");
         setLocating(false);
       },
       () => {
@@ -128,168 +220,177 @@ export default function LocationStep({ token, saved, previous }: Props) {
     setSaving(true);
     setSaveError(null);
     try {
-      const stored = await submitLocation(token, {
-        ...pin,
-        landmarkNote: note.trim(),
-      });
-      setSavedLocation(stored);
-      setEditing(false);
+      onSaved(await submitLocation(token, { ...pin, landmarkNote: note.trim() }));
     } catch (err) {
-      if (err instanceof LocationLockedError) {
-        setLocked(true);
-        setSaveError(err.message);
-      } else if (err instanceof NotFoundError) {
-        setSaveError("This link isn't valid any more. Please contact the vendor.");
-      } else {
-        setSaveError("That didn't save. Check your connection and try again.");
-      }
+      if (err instanceof LocationLockedError) onLocked(err.message);
+      else if (err instanceof NotFoundError)
+        setSaveError("This link isn't valid any more. Please contact the business.");
+      else setSaveError("That didn't save. Check your connection and try again.");
     } finally {
       setSaving(false);
     }
   }
 
-  if (!editing && savedLocation) {
-    return (
-      <div className="mt-8 rounded-lg bg-green-50 px-4 py-3 text-green-800 dark:bg-green-950 dark:text-green-200">
-        <p className="font-medium">
-          Got it. Your rider will use this pin and note to find you.
-        </p>
-        <p className="mt-2 text-sm">
-          Landmark: <span className="font-medium">{savedLocation.landmarkNote}</span>
-        </p>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="mt-3 text-sm font-medium underline underline-offset-2"
-        >
-          Change my pin
-        </button>
-      </div>
-    );
-  }
+  const title = returning
+    ? "Same spot as last time?"
+    : current
+      ? "Move your pin"
+      : "Drop your pin";
 
-  if (locked) {
-    return (
-      <div className="mt-8 rounded-lg bg-zinc-100 px-4 py-3 dark:bg-zinc-900">
-        <p>{saveError}</p>
-      </div>
-    );
+  let hint: string | null = null;
+  if (!returning) {
+    if (locating) hint = "Finding your location…";
+    else if (locateFailed)
+      hint = "We couldn't get your location. Search your estate or street instead.";
+    else if (!current)
+      hint = "Allow location access and the map jumps to you. You can still search or drag if it isn't quite right.";
   }
 
   return (
-    <section className="mt-8">
-      <h2 className="text-lg font-semibold">Show the rider where to find you</h2>
-      {previous && !savedLocation && (
-        <p className="mt-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
-          We&apos;ve loaded the spot and note you used last time. Drag the pin
-          if you&apos;re somewhere else today.
-        </p>
-      )}
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-        {locating
-          ? "Finding your location…"
-          : "Drag the pin (or tap the map) to your exact spot."}
-      </p>
-      {locateFailed && (
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          We couldn&apos;t get your location. Search for your estate or street
-          instead.
+    <CustomerScreen>
+      <p className="eyebrow">Step 2 of 2</p>
+      <h1 className="h1">{title}</h1>
+
+      {returning ? (
+        <div className="saved-banner">
+          <HistoryIcon />
+          <span>
+            Welcome back, {details.customerFirstName}. We loaded the pin and
+            note from your last order
+            {details.vendorName ? ` with ${details.vendorName}` : ""}. Drag
+            the pin if you&apos;re somewhere else today.
+          </span>
+        </div>
+      ) : (
+        <p className="sub" style={{ marginBottom: 20 }}>
+          {current
+            ? "Drag the pin or search if you've moved. The rider will use the new spot."
+            : locateFailed
+              ? "Search your estate or street, then drag the pin to your exact spot."
+              : "We've centered the map near you. Search your estate or street if it's off, then drag the pin to your exact spot."}
         </p>
       )}
 
-      <form onSubmit={search} className="mt-4 flex gap-2">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search your estate or street"
-          aria-label="Search your estate or street"
-          className="min-w-0 flex-1 rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+      <div className="map" style={returning ? { height: 260, marginBottom: 20 } : hint ? undefined : { marginBottom: 20 }}>
+        <PinMap
+          pin={pin}
+          recenterKey={recenterKey}
+          onPinChange={pinMoved}
+          showTip={showTip && !returning}
         />
-        <button
-          type="submit"
-          disabled={searching}
-          className="rounded-lg border border-zinc-300 px-4 py-2 font-medium disabled:opacity-60 dark:border-zinc-700"
-        >
-          {searching ? "…" : "Search"}
-        </button>
-      </form>
 
-      {results && (
-        <ul className="mt-2 divide-y divide-zinc-200 rounded-lg border border-zinc-200 text-sm dark:divide-zinc-800 dark:border-zinc-800">
-          {results.length === 0 && (
-            <li className="px-3 py-2 text-zinc-500">
-              No matches. Try a nearby street or landmark.
-            </li>
-          )}
-          {results.map((r) => (
-            <li key={`${r.lat},${r.lon}`}>
+        <form onSubmit={search} className="map-search" role="search">
+          <button
+            type="submit"
+            disabled={searching}
+            aria-label="Search"
+            className={searching ? "animate-pulse" : undefined}
+          >
+            <SearchIcon />
+          </button>
+          <input
+            type="search"
+            enterKeyHint="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search your estate or street"
+            placeholder="Search your estate or street"
+          />
+        </form>
+
+        {results && (
+          <div className="map-results">
+            {results.length === 0 && (
+              <p>No matches. Try a nearby street or landmark.</p>
+            )}
+            {results.map((r) => (
               <button
+                key={`${r.lat},${r.lon}`}
                 type="button"
                 onClick={() => {
                   moveTo({ lat: Number(r.lat), lng: Number(r.lon) });
+                  setSource(null);
                   setResults(null);
                 }}
-                className="w-full px-3 py-2 text-left"
               >
                 {r.display_name}
               </button>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </div>
+        )}
+
+        {source === "current" && (
+          <span className="map-chip">Near your current location</span>
+        )}
+        {source === "saved" && (
+          <span className="map-chip saved">Your saved pin</span>
+        )}
+        <a
+          className="map-attrib"
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          &copy; OpenStreetMap
+        </a>
+        <button
+          type="button"
+          className="map-locate"
+          onClick={locate}
+          disabled={locating}
+          aria-label="Center on my location"
+        >
+          <LocateIcon />
+        </button>
+      </div>
+      {hint && (
+        <p className="map-hint" role="status">
+          {hint}
+        </p>
       )}
 
-      <div className="mt-4">
-        <PinMap pin={pin} recenterKey={recenterKey} onPinChange={setPin} />
-      </div>
-      <button
-        type="button"
-        onClick={locate}
-        disabled={locating}
-        className="mt-2 text-sm font-medium text-green-700 underline underline-offset-2 disabled:opacity-60 dark:text-green-400"
-      >
-        Use my current location
-      </button>
-
-      <form onSubmit={save} className="mt-4">
-        <label htmlFor="landmark" className="block font-medium">
+      <form onSubmit={save}>
+        <label className="field-label" htmlFor="landmark">
+          <NoteIcon />
           Landmark note
         </label>
         <textarea
           id="landmark"
+          className="field"
+          rows={2}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={NOTE_MAX_LENGTH}
-          rows={2}
           required
           placeholder="e.g. Blue gate, opposite the pharmacy"
-          className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
         />
+        {returning && (
+          <p className="note-caption">
+            From your last order. Edit it if anything has changed.
+          </p>
+        )}
         <button
           type="submit"
           disabled={saving || note.trim() === ""}
-          className="mt-3 w-full rounded-lg bg-green-600 py-3 font-medium text-white disabled:opacity-60"
+          className="btn btn-primary btn-block"
         >
-          {saving ? "Saving…" : "Save my location"}
+          {saving ? "Saving…" : "Confirm Location"}
         </button>
         {saveError && (
-          <p className="mt-3 text-sm text-red-600">{saveError}</p>
+          <p className="mt-3 text-sm font-semibold text-danger" role="alert">
+            {saveError}
+          </p>
         )}
-        {savedLocation && (
+        {onCancel && (
           <button
             type="button"
-            onClick={() => {
-              moveTo({ lat: savedLocation.lat, lng: savedLocation.lng });
-              setNote(savedLocation.landmarkNote);
-              setEditing(false);
-              setSaveError(null);
-            }}
-            className="mt-3 w-full text-sm font-medium text-zinc-600 underline underline-offset-2 dark:text-zinc-400"
+            onClick={onCancel}
+            className="btn btn-secondary btn-block mt-3"
           >
             Keep my saved pin
           </button>
         )}
       </form>
-    </section>
+    </CustomerScreen>
   );
 }

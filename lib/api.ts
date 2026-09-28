@@ -11,6 +11,10 @@ export type OrderStatus =
   | "failed";
 
 export type ConfirmationDetails = {
+  // For the greeting ("Hi Amaka"); the API never sends the full name.
+  customerFirstName: string;
+  // Business the delivery is from; null until vendor accounts exist.
+  vendorName: string | null;
   itemDescription: string;
   status: OrderStatus;
   awaitingResponse: boolean;
@@ -26,9 +30,45 @@ export type LocationInput = {
   landmarkNote: string;
 };
 
+export type Vehicle = "bike" | "car" | "van";
+
+export type Rider = {
+  id: string;
+  name: string;
+  phone: string;
+  vehicle: Vehicle | null;
+};
+
+export type CreateOrderInput = {
+  customerName: string;
+  customerPhone: string;
+  itemDescription: string;
+  riderId: string;
+};
+
+export type Order = CreateOrderInput & {
+  id: string;
+  // Shown to the vendor as "Order #12".
+  orderNumber: number;
+  status: OrderStatus;
+  createdAt: string;
+  customerToken: string;
+};
+
 // Distinguishes "this link is bad" (show a dead-end message) from network or
 // server trouble (worth offering a retry).
 export class NotFoundError extends Error {}
+
+// A 400 from the API: `message` is its explanation, `fields` the inputs at
+// fault, so forms can mark them.
+export class ValidationError extends Error {
+  constructor(
+    message: string,
+    public fields: string[],
+  ) {
+    super(message);
+  }
+}
 
 // The order moved on (e.g. the rider was sent), so the pin can't change.
 // `message` is the API's customer-facing explanation.
@@ -39,6 +79,26 @@ export class LocationLockedError extends Error {
   ) {
     super(message);
   }
+}
+
+export async function getRiders(): Promise<Rider[]> {
+  const res = await fetch(`${API_URL}/riders`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`GET riders failed: ${res.status}`);
+  return res.json();
+}
+
+export async function createOrder(input: CreateOrderInput): Promise<Order> {
+  const res = await fetch(`${API_URL}/orders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 400) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`POST orders failed: ${res.status}`);
+  return res.json();
 }
 
 export async function getConfirmation(
