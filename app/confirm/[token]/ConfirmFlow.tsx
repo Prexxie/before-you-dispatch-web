@@ -61,7 +61,12 @@ export default function ConfirmFlow({ token }: { token: string }) {
     setSubmitError(false);
     try {
       const status = await submitConfirmation(token, ready);
-      setView({ kind: "answered", details, status });
+      // Reload so a confirmed customer gets their saved pin from an earlier
+      // order, which the API only offers once they've confirmed.
+      const next = await fetchView(token);
+      setView(
+        next.kind === "answered" ? next : { kind: "answered", details, status },
+      );
     } catch (err) {
       if (err instanceof NotFoundError) setView({ kind: "invalid" });
       else setSubmitError(true);
@@ -139,7 +144,13 @@ export default function ConfirmFlow({ token }: { token: string }) {
           <p className="mt-6 text-lg font-medium">
             {STATUS_MESSAGES[view.status as keyof typeof STATUS_MESSAGES]}
           </p>
-          {view.status === "confirmed" && <LocationStep token={token} />}
+          {view.status === "confirmed" && (
+            <LocationStep
+              token={token}
+              saved={view.details.location}
+              previous={view.details.previousLocation}
+            />
+          )}
         </div>
       );
   }

@@ -14,6 +14,10 @@ export type ConfirmationDetails = {
   itemDescription: string;
   status: OrderStatus;
   awaitingResponse: boolean;
+  // The pin saved for this order, if any.
+  location: LocationInput | null;
+  // The pin this customer saved on an earlier order, to prefill the map.
+  previousLocation: LocationInput | null;
 };
 
 export type LocationInput = {
@@ -25,6 +29,17 @@ export type LocationInput = {
 // Distinguishes "this link is bad" (show a dead-end message) from network or
 // server trouble (worth offering a retry).
 export class NotFoundError extends Error {}
+
+// The order moved on (e.g. the rider was sent), so the pin can't change.
+// `message` is the API's customer-facing explanation.
+export class LocationLockedError extends Error {
+  constructor(
+    message: string,
+    public status: OrderStatus,
+  ) {
+    super(message);
+  }
+}
 
 export async function getConfirmation(
   token: string,
@@ -60,12 +75,25 @@ export async function submitConfirmation(
   throw new Error(`POST confirm failed: ${res.status}`);
 }
 
-// STUB: the backend has no endpoint for saving the pin yet (MVP feature 3).
-// Swap this for a real POST once it exists; until then nothing is persisted.
+// Saves (or corrects) the customer's pin. Resolves to the location as stored.
 export async function submitLocation(
   token: string,
   location: LocationInput,
-): Promise<void> {
-  console.info("[stub] submitLocation", token, location);
-  await new Promise((resolve) => setTimeout(resolve, 400));
+): Promise<LocationInput> {
+  const res = await fetch(
+    `${API_URL}/orders/${encodeURIComponent(token)}/location`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(location),
+    },
+  );
+  if (res.status === 404) throw new NotFoundError();
+  if (res.status === 409) {
+    const body: { error: string; status: OrderStatus } = await res.json();
+    throw new LocationLockedError(body.error, body.status);
+  }
+  if (!res.ok) throw new Error(`POST location failed: ${res.status}`);
+  const body: { location: LocationInput } = await res.json();
+  return body.location;
 }
