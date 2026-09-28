@@ -18,7 +18,7 @@ import {
   RiderIcon,
   SearchIcon,
 } from "@/components/icons";
-import CustomerScreen, { ResultScreen, asSentenceStart } from "./CustomerScreen";
+import PhoneScreen, { ResultScreen, asSentenceStart } from "@/components/PhoneScreen";
 
 // Leaflet touches `window` on import, so it can only load in the browser.
 const PinMap = dynamic(() => import("@/components/PinMap"), {
@@ -247,7 +247,7 @@ function PinEditor({
   }
 
   return (
-    <CustomerScreen>
+    <PhoneScreen>
       <p className="eyebrow">Step 2 of 2</p>
       <h1 className="h1">{title}</h1>
 
@@ -391,6 +391,6 @@ function PinEditor({
           </button>
         )}
       </form>
-    </CustomerScreen>
+    </PhoneScreen>
   );
 }

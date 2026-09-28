@@ -1,30 +1,21 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FormEvent, ReactNode, useEffect, useState } from "react";
 import {
   CreateOrderInput,
-  Order,
   Rider,
   ValidationError,
   Vehicle,
   createOrder,
   getRiders,
 } from "@/lib/api";
+import { toWhatsAppNumber } from "@/lib/links";
 import {
-  customerLink,
-  customerMessage,
-  toWhatsAppNumber,
-  whatsappLink,
-} from "@/lib/links";
-import {
-  BackIcon,
-  LinkIcon,
   PackageIcon,
   PersonIcon,
   PhoneIcon,
   RiderIcon,
-  WhatsAppIcon,
 } from "@/components/icons";
 
 type Field = keyof CreateOrderInput;
@@ -66,14 +57,15 @@ type RidersState =
   | { kind: "error" }
   | { kind: "ready"; riders: Rider[] };
 
-// Design: "Vendor: Create Order", then "Vendor: Link Generated".
+// Design: "Vendor: Create Order". Creating the order opens its page, which
+// shows "Vendor: Link Generated".
 export default function CreateOrderFlow() {
+  const router = useRouter();
   const [riders, setRiders] = useState<RidersState>({ kind: "loading" });
   const [form, setForm] = useState(EMPTY_FORM);
   const [fieldErrors, setFieldErrors] = useState<Field[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [created, setCreated] = useState<Order | null>(null);
 
   function loadRiders() {
     getRiders()
@@ -97,7 +89,9 @@ export default function CreateOrderFlow() {
 
     setSubmitting(true);
     try {
-      setCreated(await createOrder(form));
+      const order = await createOrder(form);
+      // Stays "Creating…" while the order page loads, so it can't be sent twice.
+      router.push(`/vendor/orders/${order.id}`);
     } catch (err) {
       if (err instanceof ValidationError) {
         setFieldErrors(err.fields as Field[]);
@@ -107,12 +101,9 @@ export default function CreateOrderFlow() {
           "The order wasn't created. Check your connection and try again.",
         );
       }
-    } finally {
       setSubmitting(false);
     }
   }
-
-  if (created) return <LinkScreen order={created} />;
 
   const invalid = (field: Field) => fieldErrors.includes(field);
   const errorFor = (field: Field) =>
@@ -262,78 +253,5 @@ function Label({
       {icon}
       {children}
     </label>
-  );
-}
-
-function LinkScreen({ order }: { order: Order }) {
-  const link = customerLink(order.customerToken);
-  const linkRef = useRef<HTMLDivElement>(null);
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "manual">(
-    "idle",
-  );
-  const firstName = order.customerName.split(/\s+/)[0];
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopyState("copied");
-    } catch {
-      // Clipboard blocked: select the link so the vendor can copy it by hand.
-      const range = document.createRange();
-      if (linkRef.current) range.selectNodeContents(linkRef.current);
-      window.getSelection()?.removeAllRanges();
-      window.getSelection()?.addRange(range);
-      setCopyState("manual");
-    }
-  }
-
-  return (
-    <>
-      <p className="eyebrow">Order #{order.orderNumber}</p>
-      <h1 className="h1">Order created</h1>
-      <p className="sub">
-        Share this link with {firstName}. They&apos;ll confirm they&apos;re
-        ready before any rider is sent.
-      </p>
-
-      <div className="card">
-        <p className="field-label" id="customer-link-label">
-          <LinkIcon />
-          Customer confirmation link
-        </p>
-        <div
-          className="linkbox"
-          ref={linkRef}
-          aria-labelledby="customer-link-label"
-          data-testid="customer-link"
-        >
-          <LinkIcon className="shrink-0 opacity-70" />
-          {link}
-        </div>
-        <div className="row-flex" style={{ marginBottom: 4 }}>
-          <button type="button" onClick={copy} className="btn btn-secondary">
-            {copyState === "copied" ? "Copied" : "Copy Link"}
-          </button>
-          <a
-            href={whatsappLink(order.customerPhone, customerMessage(link))}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-primary"
-          >
-            <WhatsAppIcon />
-            Send via WhatsApp
-          </a>
-        </div>
-        {copyState === "manual" && (
-          <p className="mt-2 text-sm text-ink-soft" role="status">
-            Link selected. Press Ctrl+C (or ⌘C) to copy it.
-          </p>
-        )}
-        <Link href="/vendor" className="tag-back mt-4">
-          <BackIcon />
-          Back to Dashboard
-        </Link>
-      </div>
-    </>
   );
 }

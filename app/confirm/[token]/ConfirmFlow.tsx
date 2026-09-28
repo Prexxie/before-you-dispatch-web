@@ -15,11 +15,11 @@ import {
   MinusCircleIcon,
   RiderIcon,
 } from "@/components/icons";
-import CustomerScreen, {
+import PhoneScreen, {
   ResultScreen,
   Tone,
   asSentenceStart,
-} from "./CustomerScreen";
+} from "@/components/PhoneScreen";
 import LocationStep from "./LocationStep";
 
 type View =
@@ -79,12 +79,12 @@ export default function ConfirmFlow({ token }: { token: string }) {
 
   if (view.kind === "loading") {
     return (
-      <CustomerScreen centered>
+      <PhoneScreen centered>
         <LogoMark size={20} className="mb-7 block" />
         <p className="sub" role="status">
           Loading your delivery…
         </p>
-      </CustomerScreen>
+      </PhoneScreen>
     );
   }
 
@@ -122,7 +122,7 @@ export default function ConfirmFlow({ token }: { token: string }) {
   // Design: "Customer: Confirm Ready"
   if (details.status === "pending_confirmation") {
     return (
-      <CustomerScreen centered>
+      <PhoneScreen centered>
         <LogoMark size={20} className="mb-7 block" />
         <p className="eyebrow">Hi {details.customerFirstName}</p>
         <h1 className="h1">You have a delivery today</h1>
@@ -150,7 +150,7 @@ export default function ConfirmFlow({ token }: { token: string }) {
             That didn&apos;t go through. Check your connection and try again.
           </p>
         )}
-      </CustomerScreen>
+      </PhoneScreen>
     );
   }
 
@@ -159,11 +159,29 @@ export default function ConfirmFlow({ token }: { token: string }) {
     return <LocationStep token={token} details={details} />;
   }
 
-  return <StatusScreen details={details} />;
+  return (
+    <StatusScreen
+      details={details}
+      onReady={() => answer(details, true)}
+      busy={submitting !== null}
+      error={submitError}
+    />
+  );
 }
 
 // Everything after the customer's answer, except the map step.
-function StatusScreen({ details }: { details: ConfirmationDetails }) {
+function StatusScreen({
+  details,
+  onReady,
+  busy,
+  error,
+}: {
+  details: ConfirmationDetails;
+  // "Actually, I'm ready" on the Not Now screen (same day only).
+  onReady: () => void;
+  busy: boolean;
+  error: boolean;
+}) {
   const first = details.customerFirstName;
   const vendor = details.vendorName ?? "the business";
   const screens: Record<
@@ -177,8 +195,7 @@ function StatusScreen({ details }: { details: ConfirmationDetails }) {
       badge: [string, string];
     }
   > = {
-    // Design: "Customer: Not Now". The "Actually, I'm ready" undo is left out
-    // until the undo decision is made (the API doesn't allow it yet).
+    // Design: "Customer: Not Now"
     not_ready: {
       icon: <MinusCircleIcon />,
       tone: "neutral",
@@ -238,6 +255,25 @@ function StatusScreen({ details }: { details: ConfirmationDetails }) {
           <span className={`badge ${s.badge[0]}`}>{s.badge[1]}</span>
         </div>
       </div>
+      {details.status === "not_ready" && details.canChangeToReady && (
+        <>
+          <p className="mb-2.5 text-center text-[13px] text-ink-soft">
+            Tapped this by mistake?
+          </p>
+          <button
+            onClick={onReady}
+            disabled={busy}
+            className="btn btn-secondary btn-block"
+          >
+            {busy ? "Sending…" : "Actually, I'm ready"}
+          </button>
+          {error && (
+            <p className="mt-4 text-sm font-semibold text-danger" role="alert">
+              That didn&apos;t go through. Check your connection and try again.
+            </p>
+          )}
+        </>
+      )}
     </ResultScreen>
   );
 }

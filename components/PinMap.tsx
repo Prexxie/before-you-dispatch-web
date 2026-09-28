@@ -19,9 +19,11 @@ type Props = {
   // Bumped whenever the map should pan to the pin (geolocation, search);
   // dragging the pin doesn't bump it, so the map stays put while fine-tuning.
   recenterKey: number;
-  onPinChange: (pin: LatLng) => void;
+  onPinChange?: (pin: LatLng) => void;
   // "Drag to your exact spot" label above the pin (design: Pin + Landmark).
   showTip?: boolean;
+  // Rider's view: the pin can't be moved.
+  readOnly?: boolean;
 };
 
 // The design's crimson pin, drawn as HTML so it survives bundling (Leaflet's
@@ -50,7 +52,7 @@ function Recenter({ pin, recenterKey }: Pick<Props, "pin" | "recenterKey">) {
   return null;
 }
 
-function TapToMove({ onPinChange }: Pick<Props, "onPinChange">) {
+function TapToMove({ onPinChange }: { onPinChange: (pin: LatLng) => void }) {
   useMapEvents({
     click: (e) => onPinChange({ lat: e.latlng.lat, lng: e.latlng.lng }),
   });
@@ -64,7 +66,9 @@ export default function PinMap({
   recenterKey,
   onPinChange,
   showTip = false,
+  readOnly = false,
 }: Props) {
+  const editable = !readOnly && onPinChange !== undefined;
   const icon = useMemo(() => pinIcon(showTip), [showTip]);
   return (
     <MapContainer
@@ -78,17 +82,18 @@ export default function PinMap({
       <Marker
         position={[pin.lat, pin.lng]}
         icon={icon}
-        draggable
+        draggable={editable}
+        interactive={editable}
         keyboard={false}
         eventHandlers={{
           dragend: (e) => {
             const { lat, lng } = (e.target as L.Marker).getLatLng();
-            onPinChange({ lat, lng });
+            onPinChange?.({ lat, lng });
           },
         }}
       />
       <Recenter pin={pin} recenterKey={recenterKey} />
-      <TapToMove onPinChange={onPinChange} />
+      {editable && <TapToMove onPinChange={onPinChange} />}
     </MapContainer>
   );
 }

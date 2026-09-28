@@ -1,8 +1,8 @@
 import { ReactNode } from "react";
 
-// Layout of the customer artboards (390px phone): off-white page, 48px
-// padding, and on single-message screens the content centred vertically.
-export default function CustomerScreen({
+// Layout of the phone artboards (customer and rider, 390px): off-white page,
+// 48px padding, and on single-message screens the content centred vertically.
+export default function PhoneScreen({
   children,
   centered = false,
 }: {
@@ -46,19 +46,18 @@ export function ResultScreen({
   children?: ReactNode;
 }) {
   return (
-    <CustomerScreen centered>
+    <PhoneScreen centered>
       <div className={`state-icon ${TONE_STYLES[tone]}`}>{icon}</div>
       <p className="eyebrow">{eyebrow}</p>
       <h1 className="h1">{title}</h1>
       <p className="sub">{sub}</p>
       {children}
-    </CustomerScreen>
+    </PhoneScreen>
   );
 }
 
-// "2 trays of jollof rice" -> "2 trays of jollof rice", "rice & drinks." ->
-// "Rice & drinks": sentence-case without a trailing full stop, so it can
-// start a sentence in the designs' copy.
+// "rice & drinks." -> "Rice & drinks": sentence-case without a trailing full
+// stop, so it can start a sentence in the designs' copy.
 export function asSentenceStart(text: string): string {
   const trimmed = text.trim().replace(/\.+$/, "");
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);

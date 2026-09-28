@@ -570,6 +570,55 @@ body {
     margin: -14px 0 18px 0;
   }
 
+  .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--brand-tint);
+    color: var(--brand-dark);
+    font-size: 11.5px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* Rider: Mark Outcome */
+  .outcome-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 56px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 0 18px;
+    cursor: pointer;
+    font-family: inherit;
+    margin-bottom: 12px;
+    transition: opacity 0.15s;
+  }
+  .outcome-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .outcome-btn:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  .outcome-delivered {
+    background: var(--success-tint);
+    color: var(--success);
+    border: 1.5px solid #86efac;
+  }
+  .outcome-failed {
+    background: var(--danger-tint);
+    color: var(--danger);
+    border: 1.5px solid #fca5a5;
+  }
+
   /* Phones: the vendor pages are designed at desktop width. */
   @media (max-width: 640px) {
     .topbar {

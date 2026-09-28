@@ -23,3 +23,16 @@ export function whatsappLink(phone: string, message: string): string {
 export function customerMessage(link: string): string {
   return `Your delivery is going out today. Tap to confirm you're ready and show us where to find you: ${link}`;
 }
+
+export function riderLink(riderToken: string): string {
+  return `${window.location.origin}/rider/${riderToken}`;
+}
+
+export function riderMessage(link: string, customerFirstName: string): string {
+  return `New delivery for ${customerFirstName}. Their pin and landmark note are here: ${link}`;
+}
+
+// Opens Google Maps (app or web) with directions to the customer's pin.
+export function directionsLink(lat: number, lng: number): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+}

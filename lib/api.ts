@@ -22,6 +22,23 @@ export type ConfirmationDetails = {
   location: LocationInput | null;
   // The pin this customer saved on an earlier order, to prefill the map.
   previousLocation: LocationInput | null;
+  // They said "Not now" today and can still change to ready.
+  canChangeToReady: boolean;
+};
+
+// Preset reasons a rider can give for a failed delivery.
+export type FailureReason =
+  | "customer_not_ready"
+  | "address_not_found"
+  | "customer_unreachable"
+  | "other";
+
+// Wording from the "Rider: Mark Outcome" design.
+export const FAILURE_REASON_LABELS: Record<FailureReason, string> = {
+  customer_not_ready: "Customer wasn't ready",
+  address_not_found: "Couldn't find the address",
+  customer_unreachable: "Customer not reachable",
+  other: "Other",
 };
 
 export type LocationInput = {
@@ -54,6 +71,49 @@ export type Order = CreateOrderInput & {
   createdAt: string;
   customerToken: string;
 };
+
+// One order as the vendor sees it (GET /orders/:id).
+export type VendorOrder = {
+  id: string;
+  orderNumber: number;
+  customerName: string;
+  customerPhone: string;
+  itemDescription: string;
+  status: OrderStatus;
+  createdAt: string;
+  customerToken: string;
+  rider: Rider;
+  location: LocationInput | null;
+  // Only set once the customer's pin is saved.
+  riderToken: string | null;
+  dispatchedAt: string | null;
+  completedAt: string | null;
+  failureReason: FailureReason | null;
+};
+
+// What the rider's link shows (GET /rider/:token).
+export type RiderJob = {
+  orderNumber: number;
+  customerName: string;
+  customerPhone: string;
+  itemDescription: string;
+  location: LocationInput;
+  status: OrderStatus;
+  failureReason: FailureReason | null;
+  riderName: string;
+  vendorName: string | null;
+};
+
+// A 409 from the API: the order is in a state that doesn't allow this.
+// `message` is the API's explanation, `status` the order's current status.
+export class ConflictError extends Error {
+  constructor(
+    message: string,
+    public status: OrderStatus,
+  ) {
+    super(message);
+  }
+}
 
 // Distinguishes "this link is bad" (show a dead-end message) from network or
 // server trouble (worth offering a retry).
@@ -156,4 +216,60 @@ export async function submitLocation(
   if (!res.ok) throw new Error(`POST location failed: ${res.status}`);
   const body: { location: LocationInput } = await res.json();
   return body.location;
+}
+
+async function conflictOrThrow(res: Response, what: string): Promise<never> {
+  if (res.status === 404) throw new NotFoundError();
+  if (res.status === 409) {
+    const body: { error: string; status: OrderStatus } = await res.json();
+    throw new ConflictError(body.error, body.status);
+  }
+  throw new Error(`${what} failed: ${res.status}`);
+}
+
+export async function getVendorOrder(id: string): Promise<VendorOrder> {
+  const res = await fetch(`${API_URL}/orders/${encodeURIComponent(id)}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return conflictOrThrow(res, "GET order");
+  return res.json();
+}
+
+// The vendor sent the rider their link: marks the order dispatched.
+export async function dispatchOrder(id: string): Promise<VendorOrder> {
+  const res = await fetch(
+    `${API_URL}/orders/${encodeURIComponent(id)}/dispatch`,
+    // keepalive: the vendor is usually leaving for WhatsApp as this sends.
+    { method: "POST", keepalive: true },
+  );
+  if (!res.ok) return conflictOrThrow(res, "POST dispatch");
+  return res.json();
+}
+
+export async function getRiderJob(token: string): Promise<RiderJob> {
+  const res = await fetch(`${API_URL}/rider/${encodeURIComponent(token)}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return conflictOrThrow(res, "GET rider");
+  return res.json();
+}
+
+export type Outcome =
+  | { outcome: "delivered" }
+  | { outcome: "failed"; reason: FailureReason };
+
+export async function submitOutcome(
+  token: string,
+  outcome: Outcome,
+): Promise<{ status: OrderStatus; failureReason: FailureReason | null }> {
+  const res = await fetch(
+    `${API_URL}/rider/${encodeURIComponent(token)}/outcome`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(outcome),
+    },
+  );
+  if (!res.ok) return conflictOrThrow(res, "POST outcome");
+  return res.json();
 }
