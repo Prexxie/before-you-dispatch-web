@@ -1,15 +1,17 @@
 import { CSSProperties } from "react";
 import { ThemeColor } from "./api";
 
-// The "Workspace theme" swatch picker (design: "Vendor: Settings") only
-// re-tints the vendor's own dashboard chrome — the --brand family of CSS
-// variables (primary buttons, the sidebar tint, filled badges, headings).
-// --accent (the crimson highlight used for things like the "awaiting
-// confirmation" stat and the "Arrived" badge) deliberately stays fixed:
-// it's a distinct semantic role, not a color choice, and the "Before You
-// Dispatch" brand mark itself (the logo pin) never changes either — both
-// match the design's own copy, "the Before You Dispatch brand stays the
-// same everywhere else."
+// The "Workspace theme" swatch picker (design: "Vendor: Settings") re-tints
+// the vendor's own dashboard chrome to a single hue — both the --brand
+// family (secondary buttons, the sidebar tint, borders, links) and --accent
+// (primary buttons, the sidebar's active indicator, highlighted stats and
+// badges), so the whole workspace reads as one color rather than two.
+// "green" is special-cased to mean *no* override: it's today's actual
+// shipped look (brand green + accent crimson, unchanged), so a vendor who
+// never opens this picker sees no difference — see themeStyle() below.
+// Either way, the "Before You Dispatch" brand mark (the logo pin) and the
+// customer/rider pages never change, matching the design's own copy: "the
+// Before You Dispatch brand stays the same everywhere else."
 type ThemeTokens = {
   label: string;
   swatch: string;
@@ -73,13 +75,17 @@ export const THEME_COLOR_ORDER: ThemeColor[] = [
 ];
 
 // CSS custom-property overrides for the given theme, to spread onto the
-// vendor shell's root style — see AppShell.tsx.
+// vendor shell's root style — see AppShell.tsx. "green" returns {}: it's
+// today's real default (brand green + accent crimson), not a re-tint.
 export function themeStyle(color: ThemeColor): CSSProperties {
+  if (color === "green") return {};
   const t = THEME_PRESETS[color];
   return {
     "--brand": t.brand,
     "--brand-dark": t.brandDark,
     "--brand-tint": t.brandTint,
     "--brand-line": t.brandLine,
+    "--accent": t.brand,
+    "--accent-dark": t.brandDark,
   } as CSSProperties;
 }
