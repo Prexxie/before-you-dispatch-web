@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import { LogoMark } from "./icons";
+import LogoutButton from "./LogoutButton";
 
 type Section = "dashboard" | "create";
 
 // Sidebar + top bar from the "Vendor: Dashboard" design. Riders and
-// Settings arrive in weeks 2–3; log out arrives with vendor accounts.
+// Settings arrive in weeks 2–3.
 export default function AppShell({
   active,
   title,
@@ -55,6 +56,7 @@ export default function AppShell({
             Settings
             <span className="nav-soon">Soon</span>
           </span>
+          <LogoutButton className="nav-item" />
         </nav>
 
         <div className="app-main">

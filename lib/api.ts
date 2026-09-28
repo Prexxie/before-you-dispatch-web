@@ -156,6 +156,26 @@ export class ConflictError extends Error {
 // server trouble (worth offering a retry).
 export class NotFoundError extends Error {}
 
+// No valid vendor session. Thrown by vendorFetch below, which also sends the
+// browser to the login page — a caller only needs this class to recognize
+// that a redirect is already underway and stop what it was doing.
+export class UnauthorizedError extends Error {}
+
+// Wraps fetch for the vendor-only endpoints (dashboard, create order,
+// dispatch, riders). On a 401 (no session, or it expired) it sends the
+// browser to the login page and throws, so callers don't need their own
+// 401 handling — they only see the successful or already-handled cases.
+async function vendorFetch(path: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(`${API_URL}${path}`, init);
+  if (res.status === 401) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/vendor/login";
+    }
+    throw new UnauthorizedError();
+  }
+  return res;
+}
+
 // A 400 from the API: `message` is its explanation, `fields` the inputs at
 // fault, so forms can mark them.
 export class ValidationError extends Error {
@@ -179,13 +199,13 @@ export class LocationLockedError extends Error {
 }
 
 export async function getRiders(): Promise<Rider[]> {
-  const res = await fetch(`${API_URL}/riders`, { cache: "no-store" });
+  const res = await vendorFetch("/riders", { cache: "no-store" });
   if (!res.ok) throw new Error(`GET riders failed: ${res.status}`);
   return res.json();
 }
 
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
-  const res = await fetch(`${API_URL}/orders`, {
+  const res = await vendorFetch("/orders", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -265,7 +285,7 @@ async function conflictOrThrow(res: Response, what: string): Promise<never> {
 }
 
 export async function getVendorOrder(id: string): Promise<VendorOrder> {
-  const res = await fetch(`${API_URL}/orders/${encodeURIComponent(id)}`, {
+  const res = await vendorFetch(`/orders/${encodeURIComponent(id)}`, {
     cache: "no-store",
   });
   if (!res.ok) return conflictOrThrow(res, "GET order");
@@ -274,8 +294,8 @@ export async function getVendorOrder(id: string): Promise<VendorOrder> {
 
 // The vendor sent the rider their link: marks the order dispatched.
 export async function dispatchOrder(id: string): Promise<VendorOrder> {
-  const res = await fetch(
-    `${API_URL}/orders/${encodeURIComponent(id)}/dispatch`,
+  const res = await vendorFetch(
+    `/orders/${encodeURIComponent(id)}/dispatch`,
     // keepalive: the vendor is usually leaving for WhatsApp as this sends.
     { method: "POST", keepalive: true },
   );
@@ -379,7 +399,7 @@ export async function getOrders(
   if (opts.status) params.set("status", opts.status);
   if (opts.page && opts.page > 1) params.set("page", String(opts.page));
   const qs = params.toString();
-  const res = await fetch(`${API_URL}/orders${qs ? `?${qs}` : ""}`, {
+  const res = await vendorFetch(`/orders${qs ? `?${qs}` : ""}`, {
     cache: "no-store",
   });
   if (res.status === 400) {
@@ -402,10 +422,74 @@ export async function confirmReceived(token: string): Promise<void> {
 // The vendor marks a dispatched order delivered for a customer who can't
 // confirm it themselves.
 export async function markDeliveredByVendor(id: string): Promise<VendorOrder> {
-  const res = await fetch(
-    `${API_URL}/orders/${encodeURIComponent(id)}/delivered`,
+  const res = await vendorFetch(
+    `/orders/${encodeURIComponent(id)}/delivered`,
     { method: "POST" },
   );
   if (!res.ok) return conflictOrThrow(res, "POST delivered");
+  return res.json();
+}
+
+// Vendor accounts (real sign-in, ahead of first deploy — replaces the
+// earlier plan for a shared passcode).
+
+export type Vendor = {
+  id: string;
+  businessName: string;
+  businessAddress: string | null;
+  businessPhone: string | null;
+  email: string;
+};
+
+export type SignUpInput = {
+  businessName: string;
+  businessAddress?: string;
+  businessPhone?: string;
+  email: string;
+  password: string;
+};
+
+// A 401 from /auth/login or /auth/signup itself is a wrong-credentials or
+// bad-request case for the form to show, not a redirect — so these two
+// functions use plain fetch, not vendorFetch.
+
+export async function signUp(input: SignUpInput): Promise<Vendor> {
+  const res = await fetch(`${API_URL}/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 400 || res.status === 409) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`POST signup failed: ${res.status}`);
+  return res.json();
+}
+
+export async function logIn(email: string, password: string): Promise<Vendor> {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (res.status === 401) {
+    const body: { error: string } = await res.json();
+    throw new ValidationError(body.error, []);
+  }
+  if (!res.ok) throw new Error(`POST login failed: ${res.status}`);
+  return res.json();
+}
+
+export async function logOut(): Promise<void> {
+  await fetch(`${API_URL}/auth/logout`, { method: "POST" });
+}
+
+// Restores the session on load. Resolves to null rather than throwing when
+// signed out, so callers can show the login page without a console error.
+export async function getMe(): Promise<Vendor | null> {
+  const res = await fetch(`${API_URL}/auth/me`, { cache: "no-store" });
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error(`GET me failed: ${res.status}`);
   return res.json();
 }
