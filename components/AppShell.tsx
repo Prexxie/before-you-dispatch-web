@@ -40,7 +40,7 @@ export default function AppShell({
         <nav className="sidebar" aria-label="Main">
           <div className="sidebar-brand">
             <LogoMark size={18} />
-            Before You Dispatch
+            WakaRoute
           </div>
           <div className="sidebar-business">
             <strong>{businessName ?? "Your business"}</strong>
@@ -87,7 +87,7 @@ export default function AppShell({
           <header className="app-topbar">
             <Link href="/vendor" className="app-topbar-brand items-center gap-2 font-bold text-ink">
               <LogoMark size={18} />
-              Before You Dispatch
+              WakaRoute
             </Link>
             <Breadcrumbs
               items={trail(active, title)}

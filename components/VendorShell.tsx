@@ -17,8 +17,10 @@ export default function VendorShell({
     <div className="page">
       <header className="topbar">
         <Link href="/vendor" className="wordmark">
-          <LogoMark />
-          Before You Dispatch
+          <span className="inline-flex items-center justify-center rounded-md bg-white p-1">
+            <LogoMark size={20} />
+          </span>
+          WakaRoute
         </Link>
         <div className="row-flex" style={{ gap: 20, alignItems: "center" }}>
           <Link href="/vendor" className="navlink">

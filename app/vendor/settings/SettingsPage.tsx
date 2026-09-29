@@ -1,5 +1,6 @@
 "use client";
 
+import LogoLoader from "@/components/LogoLoader";
 import { FormEvent, useState } from "react";
 import {
   ThemeColor,
@@ -42,7 +43,7 @@ export default function SettingsPage() {
       <h1 className="h1">Settings</h1>
       <p className="sub">Manage your business profile and your account.</p>
 
-      {state.kind === "loading" && <p className="sub">Loading…</p>}
+      {state.kind === "loading" && <LogoLoader />}
       {state.kind === "error" && (
         <p className="sub" role="alert">
           We couldn&apos;t load your settings. Check your connection.
@@ -265,7 +266,7 @@ function ProfileEditForm({
 
 // Design: "Vendor: Settings", Workspace theme. Swatches apply immediately
 // on click (the mockup shows no separate save button here) — only the
-// vendor's own dashboard chrome re-tints; the "Before You Dispatch" brand
+// vendor's own dashboard chrome re-tints; the "WakaRoute" brand
 // mark and the customer/rider pages never change.
 function ThemeCard({ vendor, onSaved }: { vendor: Vendor; onSaved: () => void }) {
   const [saving, setSaving] = useState<ThemeColor | null>(null);
@@ -291,7 +292,7 @@ function ThemeCard({ vendor, onSaved }: { vendor: Vendor; onSaved: () => void })
         Workspace theme
       </p>
       <p className="sub" style={{ marginBottom: 0 }}>
-        Pick an accent color for your dashboard. The Before You Dispatch
+        Pick an accent color for your dashboard. The WakaRoute
         brand stays the same everywhere else.
       </p>
       <div className="swatch-row" role="radiogroup" aria-label="Workspace theme">

@@ -1,5 +1,6 @@
 "use client";
 
+import LogoLoader from "@/components/LogoLoader";
 import { FormEvent, useState } from "react";
 import {
   CreateRiderInput,
@@ -60,7 +61,7 @@ export default function RidersPage() {
 
       <div className="split-riders">
         <div className="card" style={{ padding: "8px 24px" }}>
-          {state.kind === "loading" && <p className="sub">Loading riders…</p>}
+          {state.kind === "loading" && <LogoLoader label="Loading riders…" />}
           {state.kind === "error" && (
             <p className="sub" role="alert">
               We couldn&apos;t load your riders. Check your connection.

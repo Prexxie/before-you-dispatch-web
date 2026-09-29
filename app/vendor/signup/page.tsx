@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import AuthShell from "@/components/AuthShell";
 import SignupForm from "./SignupForm";
 
-export const metadata: Metadata = { title: "Sign up · Before You Dispatch" };
+export const metadata: Metadata = { title: "Sign up · WakaRoute" };
 
 export default async function SignupPage({
   searchParams,

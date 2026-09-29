@@ -1,6 +1,7 @@
 "use client";
 
 import Script from "next/script";
+import LogoLoader from "./LogoLoader";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -84,23 +85,8 @@ export function GoogleProgress() {
     <div
       className="card"
       style={{ marginTop: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "40px 24px" }}
-      role="status"
-      aria-live="polite"
     >
-      <span
-        aria-hidden="true"
-        className="animate-spin"
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: "50%",
-          border: "3px solid var(--border)",
-          borderTopColor: "var(--accent)",
-        }}
-      />
-      <span className="sub" style={{ margin: 0 }}>
-        Loading…
-      </span>
+      <LogoLoader />
     </div>
   );
 }

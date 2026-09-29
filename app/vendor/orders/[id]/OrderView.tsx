@@ -1,5 +1,6 @@
 "use client";
 
+import LogoLoader from "@/components/LogoLoader";
 import Link from "next/link";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import {
@@ -63,7 +64,7 @@ export default function OrderView({ id }: { id: string }) {
   );
 
   if (view.kind === "loading") {
-    return <p className="sub">Loading order…</p>;
+    return <LogoLoader label="Loading order…" />;
   }
   if (view.kind === "missing") {
     return (

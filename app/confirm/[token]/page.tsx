@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ConfirmFlow from "./ConfirmFlow";
 
 export const metadata: Metadata = {
-  title: "Your delivery · Before You Dispatch",
+  title: "Your delivery · WakaRoute",
 };
 
 export default async function ConfirmPage({

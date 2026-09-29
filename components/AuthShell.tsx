@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { LogoMark } from "./icons";
+import { TAGLINE } from "@/lib/brand";
 
 // Design: "Vendor: Sign Up" / "Vendor: Log In" / "Vendor: Set Up Workspace".
 // A centered logo lockup above a narrow card — no topbar, since these pages
@@ -11,8 +12,9 @@ export default function AuthShell({ children }: { children: ReactNode }) {
         <div className="auth-card">
           <div className="auth-logo">
             <LogoMark />
-            Before You Dispatch
+            WakaRoute
           </div>
+          <p className="auth-tagline">{TAGLINE}</p>
           {children}
         </div>
       </main>

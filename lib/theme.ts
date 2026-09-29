@@ -9,9 +9,9 @@ import { ThemeColor } from "./api";
 // "green" is special-cased to mean *no* override: it's today's actual
 // shipped look (brand green + accent crimson, unchanged), so a vendor who
 // never opens this picker sees no difference — see themeStyle() below.
-// Either way, the "Before You Dispatch" brand mark (the logo pin) and the
+// Either way, the "WakaRoute" brand mark (the logo pin) and the
 // customer/rider pages never change, matching the design's own copy: "the
-// Before You Dispatch brand stays the same everywhere else."
+// WakaRoute brand stays the same everywhere else."
 type ThemeTokens = {
   label: string;
   swatch: string;

@@ -1,5 +1,6 @@
 "use client";
 
+import LogoLoader from "@/components/LogoLoader";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   ConfirmationDetails,
@@ -182,10 +183,7 @@ export default function ConfirmFlow({ token }: { token: string }) {
   if (view.kind === "loading") {
     return (
       <PhoneScreen centered>
-        <LogoMark size={20} className="mb-7 block" />
-        <p className="sub" role="status">
-          Loading your delivery…
-        </p>
+        <LogoLoader label="Loading your delivery…" />
       </PhoneScreen>
     );
   }

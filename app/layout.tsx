@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Manrope } from "next/font/google";
 import "./globals.css";
+import { BRAND_NAME, TAGLINE } from "@/lib/brand";
 
 // The design's typefaces (canvas wire.css): Fraunces for display, Manrope for
 // everything else.
@@ -15,10 +16,19 @@ const manrope = Manrope({
   subsets: ["latin"],
 });
 
+const DESCRIPTION =
+  "Customers confirm they're ready and share where to find them, before a rider is sent out.";
+
+// The title and preview a shared link shows (WhatsApp, social apps).
 export const metadata: Metadata = {
-  title: "Before You Dispatch",
-  description:
-    "Customers confirm they're ready and share where to find them, before a rider is sent out.",
+  title: `${BRAND_NAME}: ${TAGLINE}`,
+  description: DESCRIPTION,
+  openGraph: {
+    title: `${BRAND_NAME}: ${TAGLINE}`,
+    description: DESCRIPTION,
+    siteName: BRAND_NAME,
+    type: "website",
+  },
 };
 
 export const viewport: Viewport = {

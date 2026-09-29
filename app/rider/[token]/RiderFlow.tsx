@@ -1,5 +1,6 @@
 "use client";
 
+import LogoLoader from "@/components/LogoLoader";
 import dynamic from "next/dynamic";
 import { useState } from "react";
 import {
@@ -68,10 +69,7 @@ export default function RiderFlow({ token }: { token: string }) {
   if (view.kind === "loading") {
     return (
       <PhoneScreen centered>
-        <LogoMark size={20} className="mb-7 block" />
-        <p className="sub" role="status">
-          Loading the delivery…
-        </p>
+        <LogoLoader label="Loading the delivery…" />
       </PhoneScreen>
     );
   }

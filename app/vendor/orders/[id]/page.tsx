@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import VendorShell from "@/components/VendorShell";
 import OrderView from "./OrderView";
 
-export const metadata: Metadata = { title: "Order · Before You Dispatch" };
+export const metadata: Metadata = { title: "Order · WakaRoute" };
 
 export default async function OrderPage({
   params,

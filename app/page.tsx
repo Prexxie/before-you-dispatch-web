@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { LogoMark } from "@/components/icons";
+import { BRAND_NAME, TAGLINE } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Before You Dispatch",
+  title: `${BRAND_NAME}: ${TAGLINE}`,
   description:
     "The customer confirms they're ready and shares exactly where to find them, before a rider is ever sent out.",
 };
@@ -15,7 +16,7 @@ export default function Home() {
       <header className="lp-nav">
         <span className="wordmark" style={{ color: "var(--ink)" }}>
           <LogoMark />
-          Before You Dispatch
+          WakaRoute
         </span>
         <nav className="lp-nav-links" aria-label="Main">
           <a href="#how-it-works">How it works</a>
@@ -148,7 +149,8 @@ export default function Home() {
       <footer className="lp-footer">
         <span className="wordmark" style={{ color: "var(--ink)", fontSize: 14 }}>
           <LogoMark size={16} />
-          Before You Dispatch
+          WakaRoute
+          <span className="lp-footer-tagline">{TAGLINE}</span>
         </span>
         <div className="lp-footer-links">
           <span>About</span>

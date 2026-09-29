@@ -1,5 +1,6 @@
 "use client";
 
+import LogoLoader from "@/components/LogoLoader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -51,7 +52,7 @@ export default function Dashboard() {
       themeColor={themeColor}
     >
       <BusinessHeader vendor={data?.vendor ?? null} today={data?.today ?? null} />
-      {state.kind === "loading" && <p className="sub">Loading orders…</p>}
+      {state.kind === "loading" && <LogoLoader label="Loading orders…" />}
       {state.kind === "error" && (
         <p className="sub" role="alert">
           We couldn&apos;t load your orders. Check your connection. This page

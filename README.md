@@ -1,6 +1,6 @@
 # before-you-dispatch-web
 
-Frontend for **Before You Dispatch**: the vendor dashboard, the customer confirmation page, and the rider page (three views, one app). See [CLAUDE.md](CLAUDE.md) for full product context and scope.
+Frontend for **WakaRoute**: the vendor dashboard, the customer confirmation page, and the rider page (three views, one app). See [CLAUDE.md](CLAUDE.md) for full product context and scope.
 
 Stack: Next.js (App Router), TypeScript, Tailwind CSS. Talks to [before-you-dispatch-api](../before-you-dispatch-api); the endpoints it calls are documented in that repo's `API.md`.
 

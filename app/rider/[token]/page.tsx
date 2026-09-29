@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import RiderFlow from "./RiderFlow";
 
 export const metadata: Metadata = {
-  title: "Delivery · Before You Dispatch",
+  title: "Delivery · WakaRoute",
 };
 
 export default async function RiderPage({

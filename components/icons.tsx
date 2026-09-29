@@ -7,11 +7,17 @@ const PIN_PATH =
   "M12 2C7.58 2 4 5.58 4 10c0 5.25 6.72 11.19 7.01 11.44a1.5 1.5 0 0 0 1.98 0C13.28 21.19 20 15.25 20 10c0-4.42-3.58-8-8-8z";
 
 // Brand mark: crimson pin with a white tick.
+// The WakaRoute mark ("Confirmed drop", chosen 1 Oct 2026): a W drawn as one
+// route, from a hollow start ring to a crimson location pin carrying a tick.
+// The pin's tip sits on the end of the W's last stroke. The user asked for
+// this exact mark everywhere: no small-size or dark-background variants.
 export function LogoMark({ size = 20, className }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
-      <path d={PIN_PATH} fill="#9F1239" />
-      <path d="M8.3 10.3l2.3 2.3 4.6-4.6" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-hidden="true" className={className}>
+      <path d="M6 15 L13.5 35 L21.5 21.5 L29.5 35 L38 23" stroke="#9F1239" strokeWidth="4.4" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="6" cy="15" r="3" stroke="#9F1239" strokeWidth="2.4" />
+      <path d="M38 23C36 20 31 13.6 31 11A7 7 0 1 1 45 11C45 13.6 40 20 38 23Z" fill="#9F1239" />
+      <path d="M35 11.2 L37.2 13.3 L41.2 8.9" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

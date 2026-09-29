@@ -123,7 +123,21 @@ body {
     font-size: 16px;
     color: var(--ink);
     justify-content: center;
-    margin-bottom: 28px;
+    margin-bottom: 6px;
+  }
+  .auth-tagline {
+    text-align: center;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    letter-spacing: 0.02em;
+    margin: 0 0 26px 0;
+  }
+  .lp-footer-tagline {
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--ink-faint);
+    margin-left: 10px;
   }
   .auth-card {
     width: 420px;
@@ -1047,6 +1061,60 @@ body {
     color: var(--ink-faint);
     font-weight: 600;
     white-space: nowrap;
+  }
+  /* LogoLoader: the mark draws itself on a 2.4s loop. */
+  .logo-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-loader-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+  .logo-loader .ll-route {
+    stroke-dasharray: 1;
+    animation: ll-draw 2.4s cubic-bezier(0.6, 0.05, 0.3, 1) infinite;
+  }
+  .logo-loader .ll-start {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: ll-start 2.4s ease-out infinite;
+  }
+  .logo-loader .ll-pin {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: ll-drop 2.4s cubic-bezier(0.3, 1.6, 0.5, 1) infinite;
+  }
+  .logo-loader .ll-all {
+    animation: ll-fade 2.4s ease-in-out infinite;
+  }
+  @keyframes ll-draw {
+    0% { stroke-dashoffset: 1; }
+    45%, 100% { stroke-dashoffset: 0; }
+  }
+  @keyframes ll-start {
+    0% { transform: scale(0); }
+    10%, 100% { transform: none; }
+  }
+  @keyframes ll-drop {
+    0%, 42% { transform: translateY(-40%) scale(0.6); opacity: 0; }
+    58%, 100% { transform: none; opacity: 1; }
+  }
+  @keyframes ll-fade {
+    0%, 82% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .logo-loader .ll-route,
+    .logo-loader .ll-start,
+    .logo-loader .ll-pin,
+    .logo-loader .ll-all {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
   }
   .step-nav {
     display: flex;
