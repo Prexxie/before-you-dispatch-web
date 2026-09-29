@@ -66,6 +66,18 @@ export const FAILURE_REASON_LABELS: Record<FailureReason, string> = {
   other: "Other",
 };
 
+// "customer not reachable", or for "other" the rider's own words:
+// `other: "Motorbike broke down"`. Lower case, for use mid-sentence.
+export function failureText(
+  reason: FailureReason | null,
+  note: string | null,
+): string {
+  if (!reason) return "no reason given";
+  return reason === "other" && note
+    ? `other: “${note}”`
+    : FAILURE_REASON_LABELS[reason].toLowerCase();
+}
+
 export type LocationInput = {
   lat: number;
   lng: number;
@@ -132,6 +144,7 @@ export type VendorOrder = {
   receivedAt: string | null;
   completedAt: string | null;
   failureReason: FailureReason | null;
+  failureNote: string | null;
   deliveryConfirmedBy: DeliveryConfirmer | null;
   vendor: VendorInfo | null;
   // 1 for the first delivery attempt; goes up on each redelivery.
@@ -147,6 +160,7 @@ export type OrderAttempt = {
   attemptNumber: number;
   riderName: string;
   failureReason: FailureReason | null;
+  failureNote: string | null;
   dispatchedAt: string | null;
   pickedUpAt: string | null;
   arrivedAt: string | null;
@@ -164,6 +178,7 @@ export type RiderJob = {
   location: LocationInput | null;
   status: OrderStatus;
   failureReason: FailureReason | null;
+  failureNote: string | null;
   riderName: string;
   vendorName: string | null;
   // The pickup point.
@@ -419,12 +434,18 @@ export async function confirmArrived(
 
 export type Outcome =
   | { outcome: "delivered" }
-  | { outcome: "failed"; reason: FailureReason };
+  // `note` is the rider's own words and is required when the reason is
+  // "other".
+  | { outcome: "failed"; reason: FailureReason; note?: string };
 
 export async function submitOutcome(
   token: string,
   outcome: Outcome,
-): Promise<{ status: OrderStatus; failureReason: FailureReason | null }> {
+): Promise<{
+  status: OrderStatus;
+  failureReason: FailureReason | null;
+  failureNote: string | null;
+}> {
   const res = await fetch(
     `${API_URL}/rider/${encodeURIComponent(token)}/outcome`,
     {

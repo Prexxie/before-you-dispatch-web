@@ -483,7 +483,7 @@ function CompleteScreen({
     setError(null);
     try {
       const result = await submitOutcome(token, { outcome: "delivered" });
-      onChange({ ...job, status: result.status, failureReason: null });
+      onChange({ ...job, status: result.status, failureReason: null, failureNote: null });
     } catch (err) {
       if (err instanceof ConflictError && (err.status === "delivered" || err.status === "failed")) {
         onChange({ ...job, status: err.status });
@@ -521,6 +521,9 @@ function CompleteScreen({
   );
 }
 
+// Matches the API's limit (API.md, POST /rider/:riderToken/outcome).
+const NOTE_MAX_LENGTH = 200;
+
 // Design: "Rider: Couldn't Deliver"
 function CouldntDeliverScreen({
   token,
@@ -537,6 +540,9 @@ function CouldntDeliverScreen({
   const vendor = job.vendor?.name ?? "the business";
   const [reason, setReason] = useState<FailureReason | "">("");
   const [needReason, setNeedReason] = useState(false);
+  // "Other" needs the rider's own words.
+  const [note, setNote] = useState("");
+  const [needNote, setNeedNote] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -546,10 +552,23 @@ function CouldntDeliverScreen({
       setNeedReason(true);
       return;
     }
+    if (reason === "other" && note.trim() === "") {
+      setNeedNote(true);
+      return;
+    }
     setSending(true);
     try {
-      const result = await submitOutcome(token, { outcome: "failed", reason });
-      onChange({ ...job, status: result.status, failureReason: result.failureReason });
+      const result = await submitOutcome(token, {
+        outcome: "failed",
+        reason,
+        ...(reason === "other" ? { note: note.trim() } : {}),
+      });
+      onChange({
+        ...job,
+        status: result.status,
+        failureReason: result.failureReason,
+        failureNote: result.failureNote,
+      });
     } catch (err) {
       setError(
         err instanceof ConflictError
@@ -597,6 +616,39 @@ function CouldntDeliverScreen({
           <p id="reason-error" className="field-error" style={{ margin: "8px 0 0" }}>
             Choose a reason first.
           </p>
+        )}
+        {reason === "other" && (
+          <>
+            <label className="field-label" htmlFor="reason-note" style={{ marginTop: 18 }}>
+              What happened?
+            </label>
+            <textarea
+              id="reason-note"
+              className="field"
+              rows={3}
+              style={{ marginBottom: 6 }}
+              value={note}
+              maxLength={NOTE_MAX_LENGTH}
+              onChange={(e) => {
+                setNote(e.target.value);
+                setNeedNote(false);
+              }}
+              placeholder="e.g. Motorbike broke down on Ikorodu Road"
+              aria-invalid={needNote}
+              aria-describedby={needNote ? "note-error" : undefined}
+            />
+            <div className="caption" style={{ display: "flex", justifyContent: "space-between", margin: 0 }}>
+              <span>Required when you choose Other.</span>
+              <span>
+                {note.length}/{NOTE_MAX_LENGTH}
+              </span>
+            </div>
+            {needNote && (
+              <p id="note-error" className="field-error" style={{ margin: "8px 0 0" }}>
+                Tell us what happened first.
+              </p>
+            )}
+          </>
         )}
       </div>
 
@@ -662,12 +714,21 @@ function DoneScreen({ job }: { job: RiderJob }) {
           "badge-danger",
           job.failureReason ? FAILURE_REASON_LABELS[job.failureReason] : "Failed",
         ]}
+        note={job.failureNote}
       />
     </ResultScreen>
   );
 }
 
-function Summary({ job, badge }: { job: RiderJob; badge: [string, string] }) {
+function Summary({
+  job,
+  badge,
+  note,
+}: {
+  job: RiderJob;
+  badge: [string, string];
+  note?: string | null;
+}) {
   return (
     <div className="summary">
       <div className="summary-row">
@@ -684,6 +745,12 @@ function Summary({ job, badge }: { job: RiderJob; badge: [string, string] }) {
         <span className="summary-label">Item</span>
         <span className="summary-val">{asSentenceStart(job.itemDescription)}</span>
       </div>
+      {note && (
+        <div className="summary-row">
+          <span className="summary-label">Your note</span>
+          <span className="summary-val">{note}</span>
+        </div>
+      )}
       <div className="summary-row">
         <span className="summary-label">Status</span>
         <span className={`badge ${badge[0]}`}>{badge[1]}</span>

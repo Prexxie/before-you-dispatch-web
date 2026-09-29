@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   ConflictError,
-  FAILURE_REASON_LABELS,
+  failureText,
   Rider,
   VendorOrder,
   dispatchOrder,
@@ -237,9 +237,7 @@ function OrderScreen({
         <h1 className="h1">The delivery to {customer} failed</h1>
         <p className="sub">
           {rider} couldn&apos;t deliver:{" "}
-          {order.failureReason
-            ? FAILURE_REASON_LABELS[order.failureReason].toLowerCase()
-            : "no reason given"}
+          {failureText(order.failureReason, order.failureNote)}
           . You can try again with a fresh confirmation from {customer}.
         </p>
         <div className="card">
@@ -264,11 +262,7 @@ function OrderScreen({
           ? order.deliveryConfirmedBy === "vendor"
             ? `You marked this delivered for ${customer}.`
             : `${customer} confirmed they received it, and ${rider} completed the delivery.`
-          : `${rider} couldn't deliver: ${
-              order.failureReason
-                ? FAILURE_REASON_LABELS[order.failureReason].toLowerCase()
-                : "no reason given"
-            }.`}
+          : `${rider} couldn't deliver: ${failureText(order.failureReason, order.failureNote)}.`}
       </p>
       <div className="card">
         <Progress order={order} />
@@ -490,7 +484,7 @@ function Progress({ order }: { order: VendorOrder }) {
   if (order.status === "failed") {
     steps.push({
       label: order.failureReason
-        ? `Failed: ${FAILURE_REASON_LABELS[order.failureReason].toLowerCase()}`
+        ? `Failed: ${failureText(order.failureReason, order.failureNote)}`
         : `${rider} marked it failed`,
       state: "failed",
       at: formatTime(order.completedAt),
@@ -616,7 +610,7 @@ function AttemptHistory({ order }: { order: VendorOrder }) {
           <span>
             <strong>Attempt {a.attemptNumber}</strong> · {firstName(a.riderName)}
             {a.failureReason
-              ? ` · ${FAILURE_REASON_LABELS[a.failureReason].toLowerCase()}`
+              ? ` · ${failureText(a.failureReason, a.failureNote)}`
               : ""}
           </span>
           <span className="attempt-when">{formatTime(a.failedAt)}</span>
