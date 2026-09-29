@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { FormEvent, useState, useSyncExternalStore } from "react";
 import { ValidationError, resetPassword } from "@/lib/api";
 
@@ -56,6 +57,7 @@ export default function ResetPasswordForm() {
   if (!token || linkDead) {
     return (
       <>
+        <Breadcrumbs items={[{ label: "Log in", href: "/vendor/login" }, { label: "Reset password" }]} />
         <p className="eyebrow" style={{ textAlign: "center" }}>
           Reset password
         </p>
@@ -78,6 +80,7 @@ export default function ResetPasswordForm() {
   if (done) {
     return (
       <>
+        <Breadcrumbs items={[{ label: "Log in", href: "/vendor/login" }, { label: "Reset password" }]} />
         <p className="eyebrow" style={{ textAlign: "center" }}>
           All set
         </p>
@@ -98,6 +101,7 @@ export default function ResetPasswordForm() {
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Log in", href: "/vendor/login" }, { label: "Reset password" }]} />
       <p className="eyebrow" style={{ textAlign: "center" }}>
         Reset password
       </p>

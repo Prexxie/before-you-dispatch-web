@@ -6,7 +6,9 @@ export const metadata: Metadata = { title: "Create a delivery · Before You Disp
 
 export default function NewOrderPage() {
   return (
-    <VendorShell>
+    <VendorShell
+      crumbs={[{ label: "Dashboard", href: "/vendor" }, { label: "New order" }]}
+    >
       <CreateOrderFlow />
     </VendorShell>
   );

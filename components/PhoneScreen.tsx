@@ -20,13 +20,14 @@ export default function PhoneScreen({
   );
 }
 
-export type Tone = "neutral" | "brand" | "accent" | "danger";
+export type Tone = "neutral" | "brand" | "accent" | "danger" | "warning";
 
 const TONE_STYLES: Record<Tone, string> = {
   neutral: "bg-[#F3F1EC] text-[#6B6558]",
   brand: "bg-brand-tint text-brand",
   accent: "bg-accent-tint text-accent",
   danger: "bg-[#FEF2F2] text-danger",
+  warning: "bg-[#FFFBEB] text-[#D97706]",
 };
 
 // Single-message screen in the style of "Customer: Not Now": round icon,

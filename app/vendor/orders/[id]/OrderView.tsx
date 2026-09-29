@@ -1,15 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   ConflictError,
   FAILURE_REASON_LABELS,
+  Rider,
   VendorOrder,
   dispatchOrder,
+  getMe,
+  getRiders,
   getVendorOrder,
   markDeliveredByVendor,
+  redeliverOrder,
+  retriggerOrder,
 } from "@/lib/api";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { useLiveData } from "@/lib/useLiveData";
 import { formatTime } from "@/lib/time";
 import {
@@ -23,6 +29,7 @@ import {
 import {
   BackIcon,
   CheckIcon,
+  CrossIcon,
   LinkIcon,
   MessageIcon,
   RiderIcon,
@@ -30,10 +37,28 @@ import {
 } from "@/components/icons";
 
 export default function OrderView({ id }: { id: string }) {
+  // Bumped when a failed or declined order gets a fresh start, so refreshing
+  // (which stops once an order is finished) starts again.
+  const [round, setRound] = useState(0);
+  // Who's sending: the account owner's first name, for the messages.
+  const [sender, setSender] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getMe()
+      .then((me) => {
+        if (!cancelled && me) setSender(firstName(me.ownerName));
+      })
+      .catch(() => {
+        // Messages fall back to the business name alone.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Refresh until the order is finished.
   const [view, setOrder] = useLiveData(
     () => getVendorOrder(id),
-    id,
+    `${id}:${round}`,
     (order) => order.status === "delivered" || order.status === "failed",
   );
 
@@ -61,14 +86,33 @@ export default function OrderView({ id }: { id: string }) {
     );
   }
 
-  return <OrderScreen order={view.data} onChange={setOrder} />;
+  return (
+    <>
+      <Breadcrumbs
+        items={[
+          { label: "Dashboard", href: "/vendor" },
+          { label: `Order #${view.data.orderNumber}` },
+        ]}
+      />
+      <OrderScreen
+      order={view.data}
+      sender={sender}
+      onChange={(next) => {
+        setOrder(next);
+        if (next.status === "pending_confirmation") setRound((r) => r + 1);
+      }}
+      />
+    </>
+  );
 }
 
 function OrderScreen({
   order,
+  sender,
   onChange,
 }: {
   order: VendorOrder;
+  sender: string | null;
   onChange: (order: VendorOrder) => void;
 }) {
   const customer = firstName(order.customerName);
@@ -80,12 +124,15 @@ function OrderScreen({
     return (
       <>
         {eyebrow}
-        <h1 className="h1">Order created</h1>
+        <h1 className="h1">
+          {order.attempt > 1 ? `New link ready for ${customer}` : "Order created"}
+        </h1>
         <p className="sub">
           Share this link with {customer}. They&apos;ll confirm they&apos;re
           ready before any rider is sent.
         </p>
-        <CustomerLinkCard order={order} />
+        <CustomerLinkCard order={order} sender={sender} />
+        <AttemptHistory order={order} />
         <p className="mt-4 text-[13px] text-ink-soft" role="status">
           Waiting for {customer} to answer. This page updates by itself.
         </p>
@@ -93,17 +140,38 @@ function OrderScreen({
     );
   }
 
+  // Design: "Vendor: Declined (Retrigger)"
   if (order.status === "not_ready") {
     return (
       <>
         {eyebrow}
-        <h1 className="h1">{customer} isn&apos;t ready today</h1>
+        <h1 className="h1">{customer} declined this delivery</h1>
         <p className="sub">
-          They tapped &ldquo;Not now&rdquo;, so don&apos;t send {rider} out. If
-          they change their mind today, this page updates and the rider link
-          appears.
+          They chose &ldquo;Not now&rdquo; and confirmed the decline, so their
+          link is closed and no rider was sent. If the delivery is going out
+          today after all, you can retrigger it.
         </p>
-        <CustomerLinkCard order={order} />
+        <div className="card">
+          <p className="field-label">Delivery progress</p>
+          <ul className="steps">
+            <li className="step done">
+              <span className="step-dot" aria-hidden="true">
+                <CheckIcon size={12} />
+              </span>
+              Confirmation link sent to {customer}
+              <span className="step-time">{formatTime(order.createdAt)}</span>
+            </li>
+            <li className="step failed">
+              <span className="step-dot" aria-hidden="true">
+                <CrossIcon size={12} />
+              </span>
+              {customer} declined. Link closed
+              <span className="step-time">{formatTime(order.notReadyAt)}</span>
+            </li>
+          </ul>
+          <NextAttemptPanel kind="retrigger" order={order} onChange={onChange} />
+          <BackToDashboard />
+        </div>
       </>
     );
   }
@@ -138,7 +206,7 @@ function OrderScreen({
           Send this link to {rider} with the pin and landmark note already
           attached.
         </p>
-        <RiderLinkCard order={order} onChange={onChange} />
+        <RiderLinkCard order={order} sender={sender} onChange={onChange} />
       </>
     );
   }
@@ -155,6 +223,31 @@ function OrderScreen({
             : `Waiting for ${rider} to confirm pickup. Their pin and landmark note unlock automatically once they do.`}
         </p>
         <OnItsWayCard order={order} onChange={onChange} />
+      </>
+    );
+  }
+
+  // Design: "Vendor: Failed (Redeliver)"
+  if (order.status === "failed") {
+    return (
+      <>
+        <p className="eyebrow">
+          Order #{order.orderNumber} · Attempt {order.attempt}
+        </p>
+        <h1 className="h1">The delivery to {customer} failed</h1>
+        <p className="sub">
+          {rider} couldn&apos;t deliver:{" "}
+          {order.failureReason
+            ? FAILURE_REASON_LABELS[order.failureReason].toLowerCase()
+            : "no reason given"}
+          . You can try again with a fresh confirmation from {customer}.
+        </p>
+        <div className="card">
+          <Progress order={order} />
+          <NextAttemptPanel kind="redeliver" order={order} onChange={onChange} />
+          <AttemptHistory order={order} />
+          <BackToDashboard />
+        </div>
       </>
     );
   }
@@ -224,9 +317,15 @@ function MessagePreview({ to, message }: { to: string; message: string }) {
   );
 }
 
-function CustomerLinkCard({ order }: { order: VendorOrder }) {
+function CustomerLinkCard({
+  order,
+  sender,
+}: {
+  order: VendorOrder;
+  sender: string | null;
+}) {
   const link = customerLink(order.customerToken);
-  const message = customerMessage(link, order, order.vendor);
+  const message = customerMessage(link, order, order.vendor, sender);
   const boxRef = useRef<HTMLDivElement>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "manual">(
     "idle",
@@ -287,14 +386,16 @@ function CustomerLinkCard({ order }: { order: VendorOrder }) {
 
 function RiderLinkCard({
   order,
+  sender,
   onChange,
 }: {
   order: VendorOrder;
+  sender: string | null;
   onChange: (order: VendorOrder) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const link = riderLink(order.riderToken!);
-  const message = riderMessage(link, order, order.vendor);
+  const message = riderMessage(link, order, order.vendor, sender);
 
   // Decided 28 Sep: sending the rider link marks the order Dispatched. The
   // link opens WhatsApp in a new tab while this records the dispatch.
@@ -356,7 +457,7 @@ function Progress({ order }: { order: VendorOrder }) {
   const customer = firstName(order.customerName);
   const rider = firstName(order.rider.name);
   const finished = order.status === "delivered" || order.status === "failed";
-  const steps: { label: string; state: "done" | "current" | "todo"; at?: string }[] = [
+  const steps: { label: string; state: "done" | "current" | "todo" | "failed"; at?: string }[] = [
     {
       label: `${customer} confirmed they're ready and dropped a pin`,
       state: "done",
@@ -388,8 +489,10 @@ function Progress({ order }: { order: VendorOrder }) {
   ];
   if (order.status === "failed") {
     steps.push({
-      label: `${rider} marked it failed`,
-      state: "done",
+      label: order.failureReason
+        ? `Failed: ${FAILURE_REASON_LABELS[order.failureReason].toLowerCase()}`
+        : `${rider} marked it failed`,
+      state: "failed",
       at: formatTime(order.completedAt),
     });
   } else if (order.deliveryConfirmedBy === "vendor") {
@@ -421,6 +524,7 @@ function Progress({ order }: { order: VendorOrder }) {
           <li key={s.label} className={`step ${s.state}`}>
             <span className="step-dot" aria-hidden="true">
               {s.state === "done" && <CheckIcon size={12} />}
+              {s.state === "failed" && <CrossIcon size={12} />}
               {s.state === "current" && (
                 <svg width="12" height="12" viewBox="0 0 24 24">
                   <circle cx="12" cy="12" r="4" fill="currentColor" />
@@ -496,6 +600,142 @@ function OnItsWayCard({
         )}
       </div>
       <BackToDashboard />
+    </div>
+  );
+}
+
+// Earlier failed attempts of this order (kept when it was redelivered).
+function AttemptHistory({ order }: { order: VendorOrder }) {
+  if (order.attempts.length === 0) return null;
+  return (
+    <div className="mt-6">
+      <p className="field-label">Attempt history</p>
+      {order.attempts.map((a) => (
+        <div key={a.attemptNumber} className="attempt">
+          <span className="badge badge-danger">Failed</span>
+          <span>
+            <strong>Attempt {a.attemptNumber}</strong> · {firstName(a.riderName)}
+            {a.failureReason
+              ? ` · ${FAILURE_REASON_LABELS[a.failureReason].toLowerCase()}`
+              : ""}
+          </span>
+          <span className="attempt-when">{formatTime(a.failedAt)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Starting again with a fresh customer link: after the customer declined
+// ("retrigger") or after the rider failed ("redeliver"). Asks first, since
+// it closes the old links, and lets the vendor pick a different rider.
+function NextAttemptPanel({
+  kind,
+  order,
+  onChange,
+}: {
+  kind: "retrigger" | "redeliver";
+  order: VendorOrder;
+  onChange: (order: VendorOrder) => void;
+}) {
+  const customer = firstName(order.customerName);
+  const [riders, setRiders] = useState<Rider[]>([]);
+  const [riderId, setRiderId] = useState(order.rider.id);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getRiders({ activeOnly: true })
+      .then((list) => {
+        if (!cancelled) setRiders(list);
+      })
+      .catch(() => {
+        // Keep the current rider as the only choice.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // The current rider stays selectable even if they've since been deactivated.
+  const options = riders.some((r) => r.id === order.rider.id)
+    ? riders
+    : [order.rider, ...riders];
+
+  async function go() {
+    setBusy(true);
+    setError(null);
+    const pick = riderId === order.rider.id ? undefined : riderId;
+    try {
+      onChange(
+        await (kind === "retrigger" ? retriggerOrder : redeliverOrder)(order.id, pick),
+      );
+    } catch (err) {
+      setError(
+        err instanceof ConflictError
+          ? err.message
+          : "That didn't go through. Check your connection and try again.",
+      );
+      setBusy(false);
+    }
+  }
+
+  const label = kind === "retrigger" ? "Retrigger Delivery" : "Redeliver";
+  return (
+    <div className="override">
+      <label className="field-label" htmlFor="next-rider">
+        <RiderIcon />
+        {kind === "retrigger" ? "Rider" : "Rider for the next attempt"}
+      </label>
+      <select
+        id="next-rider"
+        className="field"
+        style={{ marginBottom: 14 }}
+        value={riderId}
+        onChange={(e) => setRiderId(e.target.value)}
+        disabled={busy}
+      >
+        {options.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.name}
+            {r.vehicle ? ` · ${r.vehicle[0].toUpperCase()}${r.vehicle.slice(1)}` : ""}
+            {r.id === order.rider.id ? " (same rider)" : ""}
+          </option>
+        ))}
+      </select>
+      <p>
+        <strong className="text-ink">Ready to try again?</strong>{" "}
+        {kind === "retrigger"
+          ? `Retriggering gives ${customer} a brand-new link and puts the order back to "Awaiting confirmation". The old link stays closed.`
+          : `Redeliver sends ${customer} a new link to confirm they're ready. Their saved pin and address load automatically, so it takes two taps.`}{" "}
+        Only do this if the delivery is going out today.
+      </p>
+      {confirming ? (
+        <div className="row-flex">
+          <button type="button" onClick={go} disabled={busy} className="btn btn-primary">
+            {busy ? "Sending…" : `Yes, send ${customer} a new link`}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            disabled={busy}
+            className="btn btn-secondary"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setConfirming(true)} className="btn btn-primary">
+          {label}
+        </button>
+      )}
+      {error && (
+        <p className="mt-3 text-sm font-semibold text-danger" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

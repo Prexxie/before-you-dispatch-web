@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { FormEvent, useState } from "react";
 import { ValidationError, requestPasswordReset } from "@/lib/api";
 
@@ -32,6 +33,7 @@ export default function ForgotPasswordForm() {
   if (sentTo) {
     return (
       <>
+        <Breadcrumbs items={[{ label: "Log in", href: "/vendor/login" }, { label: "Forgot password" }]} />
         <p className="eyebrow" style={{ textAlign: "center" }}>
           Check your email
         </p>
@@ -60,6 +62,7 @@ export default function ForgotPasswordForm() {
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Log in", href: "/vendor/login" }, { label: "Forgot password" }]} />
       <p className="eyebrow" style={{ textAlign: "center" }}>
         Reset password
       </p>

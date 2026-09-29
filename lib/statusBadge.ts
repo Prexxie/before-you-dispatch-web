@@ -24,7 +24,7 @@ export function statusBadge(order: {
         ? { className: "badge-filled", label: "Confirmed – ready to send" }
         : { className: "badge-filled", label: "Confirmed – waiting for pin" };
     case "not_ready":
-      return { className: "badge-neutral", label: "Not today – customer not ready" };
+      return { className: "badge-neutral", label: "Declined – link closed" };
     case "dispatched":
       if (order.receivedAt) {
         return { className: "badge-success", label: "Received – rider to complete" };

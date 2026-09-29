@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { FormEvent, useState } from "react";
 import { ValidationError, googleSignIn, logIn } from "@/lib/api";
-import GoogleButton from "@/components/GoogleButton";
+import GoogleButton, { GoogleProgress } from "@/components/GoogleButton";
 
 // Design: "Vendor: Log In". The Google button only appears when a Google
 // client ID is configured.
@@ -12,6 +13,9 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Google handed back a credential and we're signing them in; stays true
+  // through the page navigation so the form never reappears.
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -36,6 +40,7 @@ export default function LoginForm() {
 
   async function onGoogle(credential: string) {
     setError(null);
+    setGoogleBusy(true);
     try {
       const result = await googleSignIn(credential);
       if (result.status === "signed_in") {
@@ -48,18 +53,20 @@ export default function LoginForm() {
         "bydGoogleSetup",
         JSON.stringify({ ticket: result.ticket, email: result.email, name: result.name }),
       );
-      window.location.href = "/vendor/signup";
+      window.location.href = "/vendor/signup?google=1";
     } catch (err) {
       setError(
         err instanceof ValidationError
           ? err.message
           : "Couldn't sign in with Google. Check your connection and try again.",
       );
+      setGoogleBusy(false);
     }
   }
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Log in" }]} />
       <p className="eyebrow" style={{ textAlign: "center" }}>
         Welcome back
       </p>
@@ -67,7 +74,13 @@ export default function LoginForm() {
         Log in to your workspace
       </p>
 
-      <form onSubmit={submit} noValidate className="card" style={{ marginTop: 20 }}>
+      {googleBusy && <GoogleProgress />}
+      <form
+        onSubmit={submit}
+        noValidate
+        className="card"
+        style={{ marginTop: 20, display: googleBusy ? "none" : undefined }}
+      >
         <GoogleButton onCredential={onGoogle} dividerText="OR LOG IN WITH EMAIL" text="continue_with" />
         <label className="field-label" htmlFor="email">
           Email address

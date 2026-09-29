@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Breadcrumbs from "@/components/Breadcrumbs";
 import { FormEvent, useMemo, useState, useSyncExternalStore } from "react";
 import {
   SignUpInput,
@@ -11,7 +12,7 @@ import {
   googleSignUp,
   signUp,
 } from "@/lib/api";
-import GoogleButton from "@/components/GoogleButton";
+import GoogleButton, { GoogleProgress } from "@/components/GoogleButton";
 import LogoPicker from "@/components/LogoPicker";
 
 // A Google user who has no account yet: what the API verified about them,
@@ -36,7 +37,7 @@ const EMPTY_ACCOUNT: AccountFields = {
 // mockup's "Continue with Google" is shown when a Google client ID is
 // configured; a brand-new Google user skips the password form and goes
 // straight to their business details (GoogleSetupStep).
-export default function SignupForm() {
+export default function SignupForm({ fromGoogle = false }: { fromGoogle?: boolean }) {
   const [step, setStep] = useState<"account" | "workspace">("account");
   const [account, setAccount] = useState(EMPTY_ACCOUNT);
   // Set when the final submit (on the workspace step) fails on something
@@ -60,6 +61,13 @@ export default function SignupForm() {
     },
     () => null,
   );
+  // false in the server-rendered HTML and until the browser takes over, when
+  // the parked Google details can first be read.
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const fromLogin = useMemo<GoogleSetup | null>(() => {
     if (!saved || dismissedSaved) return null;
     try {
@@ -80,6 +88,11 @@ export default function SignupForm() {
     setDismissedSaved(true);
   }
 
+  // Sent here by Google sign-in: don't paint the first screen for a moment
+  // before switching to the business-details step.
+  if (fromGoogle && !hydrated) {
+    return <GoogleProgress />;
+  }
   if (activeGoogle) {
     return <GoogleSetupStep setup={activeGoogle} onBack={leaveGoogle} />;
   }
@@ -122,6 +135,7 @@ function AccountStep({
   const [form, setForm] = useState(initial);
   const [fieldErrors, setFieldErrors] = useState<Field[]>([]);
   const [error, setError] = useState<string | null>(initialError);
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   function update(field: Field, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -157,6 +171,7 @@ function AccountStep({
 
   async function handleGoogle(credential: string) {
     setError(null);
+    setGoogleBusy(true);
     try {
       const result = await googleSignIn(credential);
       if (result.status === "signed_in") {
@@ -166,6 +181,7 @@ function AccountStep({
       }
       onGoogle({ ticket: result.ticket, email: result.email, name: result.name });
     } catch (err) {
+      setGoogleBusy(false);
       setError(
         err instanceof ValidationError
           ? err.message
@@ -176,6 +192,7 @@ function AccountStep({
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Sign up" }]} />
       <p className="eyebrow" style={{ textAlign: "center" }}>
         Create your business account
       </p>
@@ -183,7 +200,13 @@ function AccountStep({
         Create your account
       </p>
 
-      <form onSubmit={submit} noValidate className="card" style={{ marginTop: 20 }}>
+      {googleBusy && <GoogleProgress />}
+      <form
+        onSubmit={submit}
+        noValidate
+        className="card"
+        style={{ marginTop: 20, display: googleBusy ? "none" : undefined }}
+      >
         <GoogleButton onCredential={handleGoogle} dividerText="OR SIGN UP WITH EMAIL" text="signup_with" />
         <label className="field-label" htmlFor="businessName">
           Business name
@@ -323,6 +346,7 @@ function WorkspaceStep({
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Sign up", onClick: () => onBack() }, { label: "Set up workspace" }]} />
       <p className="eyebrow" style={{ textAlign: "center" }}>
         Step 2 of 2
       </p>
@@ -444,6 +468,7 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
   if (expired) {
     return (
       <>
+        <Breadcrumbs items={[{ label: "Sign up", onClick: onBack }, { label: "Business details" }]} />
         <p className="eyebrow" style={{ textAlign: "center" }}>
           Google sign-in
         </p>
@@ -465,6 +490,7 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
 
   return (
     <>
+      <Breadcrumbs items={[{ label: "Sign up", onClick: onBack }, { label: "Business details" }]} />
       <p className="eyebrow" style={{ textAlign: "center" }}>
         Almost there
       </p>

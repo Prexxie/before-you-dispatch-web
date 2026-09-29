@@ -39,34 +39,81 @@ export function directionsLinkToAddress(address: string): string {
 
 export const firstName = (name: string) => name.trim().split(/\s+/)[0];
 
-// Design: "Vendor: Link Generated" message preview.
-// "Hi Amaka, this is Precious Food Business, 12 Allen Avenue, Ikeja
-// (0803 214 7765). Your delivery (…) is going out today. Tap to confirm…"
+// Design: "Vendor: Link Generated" message preview. Three wordings:
+//  - first message: says who it's from, that no rider is sent until they
+//    confirm, and what tapping the link involves (yes/not now, then a pin);
+//  - after they declined and the vendor retriggered ("retriggeredAt"): more
+//    careful, acknowledges the earlier "not ready" and that the old link is
+//    closed, no pressure;
+//  - after a failed delivery was redelivered ("attempt" above 1): apologises,
+//    and says their saved location will load.
+// The follow-ups say "Hello" rather than "Hi", a step more formal.
 export function customerMessage(
   link: string,
-  order: { customerName: string; itemDescription: string },
+  order: {
+    customerName: string;
+    itemDescription: string;
+    attempt?: number;
+    retriggeredAt?: string | null;
+  },
   vendor: VendorInfo | null,
+  // First name of the person who owns the vendor account, so the message
+  // reads "this is Chuka from Precious Food Business". Composed on the
+  // vendor's page from their own account; never sent to customers or riders
+  // by the API.
+  sender: string | null = null,
 ): string {
-  const who = vendor
-    ? `this is ${vendor.name}${vendor.address ? `, ${vendor.address}` : ""}${vendor.phone ? ` (${vendor.phone})` : ""}. `
+  const business = vendor?.name ?? "your delivery business";
+  const contact = vendor
+    ? ` (${[vendor.address, vendor.phone].filter(Boolean).join(", ")})`
     : "";
-  return `Hi ${firstName(order.customerName)}, ${who}Your delivery (${order.itemDescription.trim()}) is going out today. Tap to confirm you're ready and show us where to find you: ${link}`;
+  const who = `this is ${sender ? `${sender} from ` : ""}${business}${contact}`;
+  const name = firstName(order.customerName);
+  const item = order.itemDescription.trim();
+  const choose = `Tap the link to say "Yes, I'm ready" or "Not now".`;
+
+  if ((order.attempt ?? 1) > 1) {
+    return `Hello ${name}, ${who}.\n\nWe're sorry we couldn't complete your earlier delivery (${item}). We'd like to try again today. We won't send the rider until you confirm you're ready.\n\n${choose} Your saved location will load; please check it's still right. This link replaces the old one.\n${link}`;
+  }
+  if (order.retriggeredAt) {
+    return `Hello ${name}, ${who}.\n\nEarlier you told us you weren't ready to receive your order (${item}), so we closed that link. If you're ready now, we can still deliver it today. This new link replaces the old one.\n\nWe won't send the rider until you confirm. ${choose} If you're ready, you'll drop a pin on the map so the rider finds you without calling.\n${link}`;
+  }
+  return `Hi ${name}, ${who}.\n\nYour order (${item}) is going out today. We won't send the rider until you confirm you're ready.\n\n${choose} If you're ready, you'll drop a pin on the map so the rider finds you without calling.\n${link}`;
 }
 
-// Design: "Vendor: Rider Link Generated" message preview.
-// "Hi Tunde, new delivery from Precious Food Business (0803 214 7765).
-// Pick up at 12 Allen Avenue, Ikeja. Deliver to Amaka Obi: … Pin, landmark
-// note and directions: …"
+// Design: "Vendor: Rider Link Generated" message preview. The pin stays
+// locked until the rider confirms pickup, so the message sequences it: the
+// link first shows the pickup point, and the customer's pin appears after
+// they tap "I've Picked Up the Order".
 export function riderMessage(
   link: string,
-  order: { customerName: string; itemDescription: string; rider: { name: string } },
+  order: {
+    orderNumber: number;
+    customerName: string;
+    itemDescription: string;
+    rider: { name: string };
+    attempt?: number;
+  },
   vendor: VendorInfo | null,
+  sender: string | null = null,
 ): string {
-  const from = vendor
-    ? ` from ${vendor.name}${vendor.phone ? ` (${vendor.phone})` : ""}`
-    : "";
-  const pickup = vendor?.address ? ` Pick up at ${vendor.address}.` : "";
-  return `Hi ${firstName(order.rider.name)}, new delivery${from}.${pickup} Deliver to ${order.customerName.trim()}: ${order.itemDescription.trim()}. Pin, landmark note and directions: ${link}`;
+  const phone = vendor?.phone ? ` (${vendor.phone})` : "";
+  const intro = sender
+    ? `this is ${sender} from ${vendor?.name ?? "your delivery business"}${phone}. New delivery`
+    : `new delivery${vendor ? ` from ${vendor.name}${phone}` : ""}`;
+  const attempt = (order.attempt ?? 1) > 1 ? ` (attempt ${order.attempt}, redelivery)` : "";
+  const customer = firstName(order.customerName);
+  const lines = [
+    `Hi ${firstName(order.rider.name)}, ${intro}. Order #${order.orderNumber}${attempt}.`,
+    "",
+    ...(vendor?.address ? [`Pick up: ${vendor.address}`] : []),
+    `Deliver to: ${order.customerName.trim()}`,
+    `Items: ${order.itemDescription.trim()}`,
+    "",
+    `${customer} has confirmed they're ready and shared their location. Open the link for directions to the pickup point. Once you have the items, tap "I've Picked Up the Order" to see ${customer}'s pin, address and landmark note.`,
+    link,
+  ];
+  return lines.join("\n");
 }
 
 // "tel:" link from a phone number as typed.

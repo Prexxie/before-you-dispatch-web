@@ -74,3 +74,33 @@ export default function GoogleButton({
     </>
   );
 }
+
+// Shown from the moment Google hands back the credential until the next page
+// takes over (verifying with the API, then a full page load), so the form
+// doesn't sit there looking untouched for several seconds. Also the holding
+// screen on the sign-up page while it picks up a new Google user.
+export function GoogleProgress() {
+  return (
+    <div
+      className="card"
+      style={{ marginTop: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "40px 24px" }}
+      role="status"
+      aria-live="polite"
+    >
+      <span
+        aria-hidden="true"
+        className="animate-spin"
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: "50%",
+          border: "3px solid var(--border)",
+          borderTopColor: "var(--accent)",
+        }}
+      />
+      <span className="sub" style={{ margin: 0 }}>
+        Loading…
+      </span>
+    </div>
+  );
+}

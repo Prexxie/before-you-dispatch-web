@@ -123,7 +123,7 @@ function filters(counts: OrderList["counts"]): { value: Filter; label: string; c
     { value: "dispatched", label: "Dispatched", count: counts.outForDelivery },
     { value: "delivered", label: "Delivered", count: counts.delivered },
     { value: "failed", label: "Failed", count: counts.failed },
-    { value: "not_ready", label: "Not ready", count: counts.notReady },
+    { value: "not_ready", label: "Declined", count: counts.notReady },
   ];
 }
 

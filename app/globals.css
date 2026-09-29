@@ -128,6 +128,50 @@ body {
   .auth-card {
     width: 420px;
     max-width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  /* The forms render their own breadcrumb trail (it changes with the step);
+     it sits above the logo whatever order it's written in. */
+  .auth-card > .crumbs {
+    order: -1;
+    justify-content: center;
+  }
+  .crumbs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    margin: 0 0 18px 0;
+  }
+  .crumb {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .crumbs a,
+  .crumbs button {
+    color: var(--brand);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: none;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .crumbs a:hover,
+  .crumbs button:hover {
+    text-decoration: underline;
+  }
+  .crumbs .sep {
+    color: #c9c5bc;
+  }
+  .crumbs [aria-current] {
+    color: var(--ink);
   }
   .divider {
     display: flex;
@@ -853,6 +897,7 @@ body {
 
   /* WhatsApp message preview (Vendor: Link / Rider Link Generated) */
   .msg-preview {
+    white-space: pre-line;
     background: #f3f1ec;
     border-radius: 12px 12px 12px 4px;
     padding: 12px 14px;
@@ -1002,6 +1047,62 @@ body {
     color: var(--ink-faint);
     font-weight: 600;
     white-space: nowrap;
+  }
+  .step-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .undo-link {
+    display: block;
+    margin: 4px auto 18px auto;
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .undo-link:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+  .btn-danger-outline {
+    background: #ffffff;
+    color: var(--danger);
+    border: 1.5px solid #f5b5b5;
+  }
+  .step.failed .step-dot {
+    background: var(--danger-tint);
+    color: var(--danger);
+  }
+  .step.failed {
+    color: var(--danger);
+    font-weight: 700;
+  }
+  .attempt {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 10px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  .attempt strong {
+    color: var(--ink);
+  }
+  .attempt-when {
+    margin-left: auto;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-weight: 600;
   }
   .override {
     border-top: 1px solid #f1efea;

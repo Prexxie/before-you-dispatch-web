@@ -52,6 +52,21 @@ function Recenter({ pin, recenterKey }: Pick<Props, "pin" | "recenterKey">) {
   return null;
 }
 
+// The map stays mounted (hidden) while the customer goes back a step, so their
+// pin and notes are still there when they come forward. Leaflet measures its
+// container once, so re-measure whenever it changes size, such as when it is
+// shown again.
+function InvalidateOnResize() {
+  const map = useMap();
+  useEffect(() => {
+    const el = map.getContainer();
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
 function TapToMove({ onPinChange }: { onPinChange: (pin: LatLng) => void }) {
   useMapEvents({
     click: (e) => onPinChange({ lat: e.latlng.lat, lng: e.latlng.lng }),
@@ -93,6 +108,7 @@ export default function PinMap({
         }}
       />
       <Recenter pin={pin} recenterKey={recenterKey} />
+      <InvalidateOnResize />
       {editable && <TapToMove onPinChange={onPinChange} />}
     </MapContainer>
   );

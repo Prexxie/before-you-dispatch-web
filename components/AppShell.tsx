@@ -2,10 +2,17 @@ import Link from "next/link";
 import { ReactNode } from "react";
 import { ThemeColor } from "@/lib/api";
 import { themeStyle } from "@/lib/theme";
+import Breadcrumbs, { Crumb } from "./Breadcrumbs";
 import { LogoMark } from "./icons";
 import LogoutButton from "./LogoutButton";
 
 type Section = "dashboard" | "create" | "riders" | "settings";
+
+// Design: the trail in the top bar, one level under the dashboard.
+function trail(active: Section, title: string): Crumb[] {
+  if (active === "dashboard") return [{ label: "Dashboard" }];
+  return [{ label: "Dashboard", href: "/vendor" }, { label: title }];
+}
 
 // Sidebar + top bar from the "Vendor: Dashboard" design.
 export default function AppShell({
@@ -82,9 +89,11 @@ export default function AppShell({
               <LogoMark size={18} />
               Before You Dispatch
             </Link>
-            <span className="app-topbar-title text-[14.5px] font-bold text-ink">
-              {title}
-            </span>
+            <Breadcrumbs
+              items={trail(active, title)}
+              className="app-topbar-title"
+              style={{ margin: 0 }}
+            />
             <Link
               href="/vendor/orders/new"
               className="btn btn-primary"

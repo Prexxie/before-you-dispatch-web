@@ -23,8 +23,9 @@ export type ConfirmationDetails = {
   location: LocationInput | null;
   // The pin this customer saved on an earlier order, to prefill the map.
   previousLocation: LocationInput | null;
-  // They said "Not now" today and can still change to ready.
-  canChangeToReady: boolean;
+  // Set when the vendor redelivered after the rider failed the last attempt:
+  // which attempt this is and why the previous one failed.
+  redelivery: { attempt: number; failureReason: FailureReason | null } | null;
   // Business the delivery is from (name, address, phone), or null.
   vendor: VendorInfo | null;
   // Who's bringing it, once the rider has been sent.
@@ -69,6 +70,9 @@ export type LocationInput = {
   lat: number;
   lng: number;
   landmarkNote: string;
+  // The street address the customer confirmed with the pin; null if they
+  // didn't give one (older orders, or left blank).
+  address: string | null;
 };
 
 export type Vehicle = "bike" | "car" | "van";
@@ -130,6 +134,24 @@ export type VendorOrder = {
   failureReason: FailureReason | null;
   deliveryConfirmedBy: DeliveryConfirmer | null;
   vendor: VendorInfo | null;
+  // 1 for the first delivery attempt; goes up on each redelivery.
+  attempt: number;
+  // When the vendor retriggered an order the customer declined; null if never.
+  retriggeredAt: string | null;
+  // Earlier failed attempts, oldest first (kept when a failed order is
+  // redelivered).
+  attempts: OrderAttempt[];
+};
+
+export type OrderAttempt = {
+  attemptNumber: number;
+  riderName: string;
+  failureReason: FailureReason | null;
+  dispatchedAt: string | null;
+  pickedUpAt: string | null;
+  arrivedAt: string | null;
+  failedAt: string | null;
+  location: LocationInput | null;
 };
 
 // What the rider's link shows (GET /rider/:token). `location` is withheld by
@@ -364,6 +386,24 @@ export async function confirmPickup(
   return res.json();
 }
 
+// The rider tapped "picked up" by mistake: locks the customer's pin again.
+export async function undoPickup(token: string): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/rider/${encodeURIComponent(token)}/undo-pickup`,
+    { method: "POST" },
+  );
+  if (!res.ok) return conflictOrThrow(res, "POST undo-pickup");
+}
+
+// The rider tapped "I've arrived" by mistake.
+export async function undoArrived(token: string): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/rider/${encodeURIComponent(token)}/undo-arrived`,
+    { method: "POST" },
+  );
+  if (!res.ok) return conflictOrThrow(res, "POST undo-arrived");
+}
+
 // The rider confirms they've reached the customer's location. Purely a
 // status update: doesn't unlock anything, harmless to tap again.
 export async function confirmArrived(
@@ -482,6 +522,34 @@ export async function markDeliveredByVendor(id: string): Promise<VendorOrder> {
   );
   if (!res.ok) return conflictOrThrow(res, "POST delivered");
   return res.json();
+}
+
+// Starting again with a fresh customer link. `riderId` picks a different rider
+// (one of the vendor's active ones); leave it out to keep the same rider.
+async function newAttempt(
+  id: string,
+  action: "retrigger" | "redeliver",
+  riderId?: string,
+): Promise<VendorOrder> {
+  const res = await vendorFetch(`/orders/${encodeURIComponent(id)}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(riderId ? { riderId } : {}),
+  });
+  if (!res.ok) return conflictOrThrow(res, `POST ${action}`);
+  return res.json();
+}
+
+// The customer declined ("Not now" + the warning): the vendor issues a new
+// link and the customer starts fresh.
+export function retriggerOrder(id: string, riderId?: string): Promise<VendorOrder> {
+  return newAttempt(id, "retrigger", riderId);
+}
+
+// The rider marked it failed: keep that attempt in the history and send the
+// customer a new link to confirm they're ready again.
+export function redeliverOrder(id: string, riderId?: string): Promise<VendorOrder> {
+  return newAttempt(id, "redeliver", riderId);
 }
 
 // Vendor accounts (real sign-in, ahead of first deploy — replaces the

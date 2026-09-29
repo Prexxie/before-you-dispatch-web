@@ -9,6 +9,8 @@ import {
   RiderJob,
   confirmArrived,
   confirmPickup,
+  undoArrived,
+  undoPickup,
   getRiderJob,
   submitOutcome,
 } from "@/lib/api";
@@ -36,6 +38,7 @@ import {
   NoteIcon,
   PackageIcon,
   PinCheckIcon,
+  PinIcon,
 } from "@/components/icons";
 
 // Leaflet touches `window` on import, so it can only load in the browser.
@@ -254,10 +257,11 @@ function EnRouteScreen({
   onChange: (job: RiderJob) => void;
   onCouldntDeliver: () => void;
 }) {
-  const { lat, lng, landmarkNote } = location;
+  const { lat, lng, landmarkNote, address } = location;
   const customer = firstName(job.customerName);
   const [arriving, setArriving] = useState(false);
   const [arriveError, setArriveError] = useState<string | null>(null);
+  const [undoing, setUndoing] = useState(false);
 
   async function arrived() {
     setArriving(true);
@@ -273,6 +277,30 @@ function EnRouteScreen({
       );
     } finally {
       setArriving(false);
+    }
+  }
+
+  // A mistaken tap: go back a step. Undoing pickup locks the pin and returns
+  // to the pickup screen; undoing arrival returns to "I've Arrived".
+  async function undo(step: "pickup" | "arrival") {
+    setUndoing(true);
+    setArriveError(null);
+    try {
+      if (step === "pickup") {
+        await undoPickup(token);
+        onChange({ ...job, pickedUpAt: null, location: null, arrivedAt: null });
+      } else {
+        await undoArrived(token);
+        onChange({ ...job, arrivedAt: null });
+      }
+    } catch (err) {
+      setArriveError(
+        err instanceof ConflictError
+          ? err.message
+          : "That didn't go through. Check your connection and try again.",
+      );
+    } finally {
+      setUndoing(false);
     }
   }
 
@@ -332,6 +360,18 @@ function EnRouteScreen({
         </a>
       </div>
 
+      {address && (
+        <>
+          <p className="field-label">
+            <PinIcon />
+            Customer&apos;s address
+          </p>
+          <div className="linkbox" style={{ marginBottom: 18 }}>
+            {address}
+          </div>
+        </>
+      )}
+
       <p className="field-label">
         <NoteIcon />
         Landmark note
@@ -350,12 +390,35 @@ function EnRouteScreen({
         <DirectionsIcon />
         Get Directions
       </a>
+      {address && (
+        <p className="caption" style={{ marginTop: -6, marginBottom: 14 }}>
+          Directions go to the customer&apos;s pin. Google may label it with the
+          nearest house number, so go by the address above.
+        </p>
+      )}
 
       {job.arrivedAt ? (
-        <button className="btn btn-locked btn-block" disabled>
-          <CheckIcon size={15} />
-          Arrived at {customer}&apos;s Location
-        </button>
+        <>
+          <button className="btn btn-locked btn-block" disabled>
+            <CheckIcon size={15} />
+            Arrived at {customer}&apos;s Location
+          </button>
+          {!job.receivedAt && (
+            <button
+              type="button"
+              onClick={() => undo("arrival")}
+              disabled={undoing}
+              className="undo-link"
+            >
+              Arrived by mistake? Undo
+            </button>
+          )}
+          {arriveError && (
+            <p className="mt-1 text-sm font-semibold text-danger" role="alert">
+              {arriveError}
+            </p>
+          )}
+        </>
       ) : (
         <>
           <button onClick={arrived} disabled={arriving} className="btn btn-primary btn-block">
@@ -366,6 +429,14 @@ function EnRouteScreen({
             Tap this once you&apos;re at {customer}&apos;s location. They&apos;ll see
             you&apos;ve arrived.
           </p>
+          <button
+            type="button"
+            onClick={() => undo("pickup")}
+            disabled={undoing}
+            className="undo-link"
+          >
+            Picked up by mistake? Undo pickup
+          </button>
           {arriveError && (
             <p className="mt-3 text-sm font-semibold text-danger" role="alert">
               {arriveError}
