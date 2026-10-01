@@ -64,7 +64,7 @@ export default function OrderView({ id }: { id: string }) {
   );
 
   if (view.kind === "loading") {
-    return <LogoLoader label="Loading order…" />;
+    return <LogoLoader label="Loading order…" page />;
   }
   if (view.kind === "missing") {
     return (

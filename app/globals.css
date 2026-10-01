@@ -536,6 +536,11 @@ body {
     background: #f3f1ec;
     color: #6b6558;
   }
+  /* "Dispatched": sent out, not yet picked up. Blue, a hue no other status uses. */
+  .badge-info {
+    background: #eff6ff;
+    color: #1d4ed8;
+  }
   .badge-accent {
     background: var(--accent);
     color: #ffffff;
@@ -1069,13 +1074,42 @@ body {
     align-items: center;
     gap: 12px;
   }
+  /* A whole vendor page loading: centred on the whole screen (not just the
+     content column), over the page but letting clicks through, so the
+     sidebar and top bar stay usable. */
+  .logo-loader-page {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    justify-content: center;
+    gap: 18px;
+    pointer-events: none;
+  }
+  .logo-loader-cover {
+    background: var(--page);
+    z-index: 50;
+    pointer-events: auto;
+  }
+  .logo-loader-title {
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .logo-loader-page .logo-loader-label {
+    font-size: 16px;
+  }
   .logo-loader-label {
     font-size: 14px;
     font-weight: 600;
     color: var(--ink-soft);
   }
+  /* The route's real length (about 67.5 in the 48-unit drawing), not
+     pathLength="1": older iPhone Safari mis-scales pathLength dashes, which
+     left the line static there. */
   .logo-loader .ll-route {
-    stroke-dasharray: 1;
+    stroke-dasharray: 68;
     animation: ll-draw 2.4s cubic-bezier(0.6, 0.05, 0.3, 1) infinite;
   }
   .logo-loader .ll-start {
@@ -1092,7 +1126,7 @@ body {
     animation: ll-fade 2.4s ease-in-out infinite;
   }
   @keyframes ll-draw {
-    0% { stroke-dashoffset: 1; }
+    0% { stroke-dashoffset: 68; }
     45%, 100% { stroke-dashoffset: 0; }
   }
   @keyframes ll-start {
@@ -1107,14 +1141,22 @@ body {
     0%, 82% { opacity: 1; }
     100% { opacity: 0; }
   }
+  /* Phones with "Reduce Motion" on: no drawing or dropping, just the whole
+     logo gently fading in and out, so it still reads as loading. */
   @media (prefers-reduced-motion: reduce) {
     .logo-loader .ll-route,
     .logo-loader .ll-start,
-    .logo-loader .ll-pin,
-    .logo-loader .ll-all {
+    .logo-loader .ll-pin {
       animation: none;
       stroke-dashoffset: 0;
     }
+    .logo-loader .ll-all {
+      animation: ll-breathe 1.6s ease-in-out infinite;
+    }
+  }
+  @keyframes ll-breathe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
   }
   .step-nav {
     display: flex;
@@ -1373,6 +1415,29 @@ body {
     background: var(--brand-dark);
     border-color: var(--brand-dark);
     color: #ffffff;
+  }
+  /* Each status chip takes its status badge's colour (lib/statusBadge.ts),
+     darkened where needed so white text stays readable when selected. A dot
+     shows the colour while unselected. "All" keeps the theme colour. */
+  .filter-chip[data-status="pending_confirmation"] { --chip: #b45309; }
+  .filter-chip[data-status="confirmed"] { --chip: var(--brand); }
+  .filter-chip[data-status="dispatched"] { --chip: #1d4ed8; }
+  .filter-chip[data-status="delivered"] { --chip: #15803d; }
+  .filter-chip[data-status="failed"] { --chip: #b91c1c; }
+  .filter-chip[data-status="not_ready"] { --chip: #6b6558; }
+  .filter-chip[data-status]:not([data-status="all"]).active {
+    background: var(--chip);
+    border-color: var(--chip);
+  }
+  .filter-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--chip);
+    flex-shrink: 0;
+  }
+  .filter-chip.active .filter-dot {
+    background: #ffffff;
   }
   .filter-count {
     font-size: 11.5px;

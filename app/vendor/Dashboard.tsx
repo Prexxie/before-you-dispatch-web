@@ -3,7 +3,7 @@
 import LogoLoader from "@/components/LogoLoader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   OrderList,
   OrderStatus,
@@ -14,7 +14,8 @@ import {
 } from "@/lib/api";
 import { useLiveData } from "@/lib/useLiveData";
 import { statusBadge } from "@/lib/statusBadge";
-import { formatTime } from "@/lib/time";
+import { formatDayTime } from "@/lib/time";
+import { WELCOME_LOADING, WELCOME_TITLE } from "@/lib/brand";
 import { initials } from "@/lib/format";
 import AppShell from "@/components/AppShell";
 import { LogoMark } from "@/components/icons";
@@ -25,10 +26,17 @@ type Filter = "all" | OrderStatus;
 
 // Design: "Vendor: Dashboard". Every order (not just today's — see the
 // "Recent orders" scope decision, 29 Sep), refreshing every 15 seconds.
-export default function Dashboard() {
+export default function Dashboard({ welcome = false }: { welcome?: boolean }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(1);
   const key = `${filter}-${page}`;
+  // Drop ?welcome=1 from the address straight away (the flag is already
+  // read), so a later reload shows the normal loader.
+  useEffect(() => {
+    if (welcome && window.location.search.includes("welcome=1")) {
+      window.history.replaceState(null, "", "/vendor");
+    }
+  }, [welcome]);
   const [state] = useLiveData(
     () => getOrders({ status: filter === "all" ? undefined : filter, page }),
     key,
@@ -51,8 +59,13 @@ export default function Dashboard() {
       businessCategory={category ? VENDOR_CATEGORY_LABELS[category] : null}
       themeColor={themeColor}
     >
-      <BusinessHeader vendor={data?.vendor ?? null} today={data?.today ?? null} />
-      {state.kind === "loading" && <LogoLoader label="Loading orders…" />}
+      {state.kind !== "loading" && <BusinessHeader vendor={data?.vendor ?? null} />}
+      {state.kind === "loading" &&
+        (welcome ? (
+          <LogoLoader page cover title={WELCOME_TITLE} label={WELCOME_LOADING} />
+        ) : (
+          <LogoLoader label="Loading orders…" page />
+        ))}
       {state.kind === "error" && (
         <p className="sub" role="alert">
           We couldn&apos;t load your orders. Check your connection. This page
@@ -72,22 +85,17 @@ export default function Dashboard() {
   );
 }
 
-// Business name with its address and phone (design: "Vendor: Dashboard");
-// today's date and a quick "today" line when those aren't set.
-function BusinessHeader({
-  vendor,
-  today,
-}: {
-  vendor: VendorInfo | null;
-  today: OrderList["today"] | null;
-}) {
+// Business name with its address (design: "Vendor: Dashboard"); today's date
+// when the address isn't set. The phone and the "orders today" count were
+// removed at the user's request (the stat tiles already show today's count).
+function BusinessHeader({ vendor }: { vendor: VendorInfo | null }) {
   const date = new Date().toLocaleDateString("en-NG", {
     weekday: "long",
     day: "numeric",
     month: "long",
     timeZone: "Africa/Lagos",
   });
-  const contact = [vendor?.address, vendor?.phone].filter(Boolean).join(" · ");
+  const contact = vendor?.address ?? "";
   return (
     <div className="biz-header">
       <div className="biz-logo" aria-hidden="true">
@@ -107,7 +115,6 @@ function BusinessHeader({
         </h1>
         <p className="sub" style={{ margin: 0 }}>
           {contact || <>Today &middot; {date}</>}
-          {contact && today ? ` · ${today.total} order${today.total === 1 ? "" : "s"} today` : ""}
         </p>
       </div>
     </div>
@@ -178,7 +185,9 @@ function Board({
                 onClick={() => onFilterChange(f.value)}
                 aria-pressed={filter === f.value}
                 className={`filter-chip ${filter === f.value ? "active" : ""}`}
+                data-status={f.value}
               >
+                {f.value !== "all" && <span className="filter-dot" aria-hidden="true" />}
                 {f.label}
                 <span className="filter-count">{f.count}</span>
               </button>
@@ -228,7 +237,7 @@ function Board({
                               {badge.label}
                             </span>
                           </td>
-                          <td className="whitespace-nowrap tabular-nums">{formatTime(o.updatedAt)}</td>
+                          <td className="whitespace-nowrap tabular-nums">{formatDayTime(o.updatedAt)}</td>
                         </tr>
                       );
                     })}

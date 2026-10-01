@@ -2,6 +2,7 @@
 
 import Script from "next/script";
 import LogoLoader from "./LogoLoader";
+import { WELCOME_LOADING, WELCOME_TITLE } from "@/lib/brand";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -81,12 +82,5 @@ export default function GoogleButton({
 // doesn't sit there looking untouched for several seconds. Also the holding
 // screen on the sign-up page while it picks up a new Google user.
 export function GoogleProgress() {
-  return (
-    <div
-      className="card"
-      style={{ marginTop: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "40px 24px" }}
-    >
-      <LogoLoader />
-    </div>
-  );
+  return <LogoLoader page cover title={WELCOME_TITLE} label={WELCOME_LOADING} />;
 }

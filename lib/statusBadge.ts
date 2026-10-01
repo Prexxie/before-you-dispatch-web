@@ -34,7 +34,7 @@ export function statusBadge(order: {
       }
       return order.pickedUpAt
         ? { className: "badge-filled", label: "Picked up – on the way" }
-        : { className: "badge-outline", label: "Dispatched" };
+        : { className: "badge-info", label: "Dispatched" };
     case "delivered":
       return order.deliveryConfirmedBy === "vendor"
         ? { className: "badge-success", label: "Delivered – confirmed by you" }

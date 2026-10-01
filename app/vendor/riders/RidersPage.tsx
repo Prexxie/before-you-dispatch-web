@@ -36,9 +36,11 @@ export default function RidersPage() {
   const [state] = useLiveData(() => getRiders(), `riders-${refreshKey}`);
   const [meState] = useLiveData(() => getMe(), "riders-me");
   const riders = state.kind === "ready" ? state.data : null;
-  const businessName = meState.kind === "ready" ? (meState.data?.businessName ?? null) : null;
+  const businessName =
+    meState.kind === "ready" ? (meState.data?.businessName ?? null) : null;
   const category = meState.kind === "ready" ? meState.data?.category : null;
-  const themeColor = meState.kind === "ready" ? meState.data?.themeColor : undefined;
+  const themeColor =
+    meState.kind === "ready" ? meState.data?.themeColor : undefined;
 
   function reload() {
     setRefreshKey((k) => k + 1);
@@ -52,57 +54,69 @@ export default function RidersPage() {
       businessCategory={category ? VENDOR_CATEGORY_LABELS[category] : null}
       themeColor={themeColor}
     >
-      <p className="eyebrow">Your team</p>
-      <h1 className="h1">Riders</h1>
-      <p className="sub">
-        Add the riders you already work with. Once added, they&apos;ll show up
-        in the &quot;Assign a rider&quot; list when you create a delivery.
-      </p>
+      {state.kind === "loading" ? (
+        <LogoLoader label="Loading riders…" page />
+      ) : (
+        <>
+          <p className="eyebrow">Your team</p>
+          <h1 className="h1">Riders</h1>
+          <p className="sub">
+            Add the riders you already work with. Once added, they&apos;ll show
+            up in the &quot;Assign a rider&quot; list when you create a
+            delivery.
+          </p>
 
-      <div className="split-riders">
-        <div className="card" style={{ padding: "8px 24px" }}>
-          {state.kind === "loading" && <LogoLoader label="Loading riders…" />}
-          {state.kind === "error" && (
-            <p className="sub" role="alert">
-              We couldn&apos;t load your riders. Check your connection.
-            </p>
-          )}
-          {riders && riders.length === 0 && (
-            <p className="sub" style={{ padding: "18px 0" }}>
-              No riders yet — add your first one.
-            </p>
-          )}
-          {riders && riders.length > 0 && (
-            <div className="table-scroll">
-              <table className="wire">
-                <thead>
-                  <tr>
-                    <th scope="col">Rider</th>
-                    <th scope="col">Phone</th>
-                    <th scope="col">Vehicle</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">
-                      <span className="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {riders.map((r) => (
-                    <RiderRow key={r.id} rider={r} onChanged={reload} />
-                  ))}
-                </tbody>
-              </table>
+          <div className="split-riders">
+            <div className="card" style={{ padding: "8px 24px" }}>
+              {state.kind === "error" && (
+                <p className="sub" role="alert">
+                  We couldn&apos;t load your riders. Check your connection.
+                </p>
+              )}
+              {riders && riders.length === 0 && (
+                <p className="sub" style={{ padding: "18px 0" }}>
+                  No riders yet — add your first one.
+                </p>
+              )}
+              {riders && riders.length > 0 && (
+                <div className="table-scroll">
+                  <table className="wire">
+                    <thead>
+                      <tr>
+                        <th scope="col">Rider</th>
+                        <th scope="col">Phone</th>
+                        <th scope="col">Vehicle</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {riders.map((r) => (
+                        <RiderRow key={r.id} rider={r} onChanged={reload} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <AddRiderCard onAdded={reload} />
-      </div>
+            <AddRiderCard onAdded={reload} />
+          </div>
+        </>
+      )}
     </AppShell>
   );
 }
 
-function RiderRow({ rider, onChanged }: { rider: Rider; onChanged: () => void }) {
+function RiderRow({
+  rider,
+  onChanged,
+}: {
+  rider: Rider;
+  onChanged: () => void;
+}) {
   const [busy, setBusy] = useState(false);
 
   async function toggle() {
@@ -124,12 +138,19 @@ function RiderRow({ rider, onChanged }: { rider: Rider; onChanged: () => void })
       <td>{rider.phone}</td>
       <td>{rider.vehicle ? VEHICLE_LABELS[rider.vehicle] : "—"}</td>
       <td>
-        <span className={`badge ${rider.active ? "badge-success" : "badge-neutral"}`}>
+        <span
+          className={`badge ${rider.active ? "badge-success" : "badge-neutral"}`}
+        >
           {rider.active ? "Active" : "Inactive"}
         </span>
       </td>
       <td>
-        <button type="button" onClick={toggle} disabled={busy} className="underline text-[13px]">
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={busy}
+          className="underline text-[13px]"
+        >
           {busy ? "…" : rider.active ? "Deactivate" : "Reactivate"}
         </button>
       </td>
@@ -165,7 +186,11 @@ function AddRiderCard({ onAdded }: { onAdded: () => void }) {
 
     setSubmitting(true);
     try {
-      await createRider({ ...form, name: form.name.trim(), phone: form.phone.trim() });
+      await createRider({
+        ...form,
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+      });
       onAdded();
       setForm(EMPTY_FORM);
     } catch (err) {
@@ -173,7 +198,9 @@ function AddRiderCard({ onAdded }: { onAdded: () => void }) {
         setFieldErrors(err.fields as Field[]);
         setError(err.message);
       } else {
-        setError("Couldn't add that rider. Check your connection and try again.");
+        setError(
+          "Couldn't add that rider. Check your connection and try again.",
+        );
       }
     } finally {
       setSubmitting(false);
@@ -235,7 +262,11 @@ function AddRiderCard({ onAdded }: { onAdded: () => void }) {
         ))}
       </select>
 
-      <button type="submit" disabled={submitting} className="btn btn-primary btn-block">
+      <button
+        type="submit"
+        disabled={submitting}
+        className="btn btn-primary btn-block"
+      >
         {submitting ? "Adding…" : "+ Add Rider"}
       </button>
       {error && (

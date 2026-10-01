@@ -4,10 +4,18 @@ import Link from "next/link";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { FormEvent, useState } from "react";
 import { ValidationError, googleSignIn, logIn } from "@/lib/api";
-import GoogleButton, { GoogleProgress } from "@/components/GoogleButton";
+import GoogleButton from "@/components/GoogleButton";
+import { WELCOME_LOADING, WELCOME_TITLE } from "@/lib/brand";
+import LogoLoader from "@/components/LogoLoader";
 
 // Design: "Vendor: Log In". The Google button only appears when a Google
 // client ID is configured.
+// Adds ?welcome=1 so the page they land on keeps the same welcome loader up
+// until its data has loaded.
+function withWelcome(path: string): string {
+  return `${path}${path.includes("?") ? "&" : "?"}welcome=1`;
+}
+
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +35,7 @@ export default function LoginForm() {
       // just-set session cookie is there for the proxy's next check and
       // every page below reloads with a fresh, authenticated fetch.
       const next = new URLSearchParams(window.location.search).get("next");
-      window.location.href = next && next.startsWith("/vendor") ? next : "/vendor";
+      window.location.href = withWelcome(next && next.startsWith("/vendor") ? next : "/vendor");
     } catch (err) {
       setError(
         err instanceof ValidationError
@@ -44,8 +52,8 @@ export default function LoginForm() {
     try {
       const result = await googleSignIn(credential);
       if (result.status === "signed_in") {
-        const next = new URLSearchParams(window.location.search).get("next");
-        window.location.href = next && next.startsWith("/vendor") ? next : "/vendor";
+          const next = new URLSearchParams(window.location.search).get("next");
+        window.location.href = withWelcome(next && next.startsWith("/vendor") ? next : "/vendor");
         return;
       }
       // No account for this Google user yet: carry on to business details.
@@ -74,7 +82,10 @@ export default function LoginForm() {
         Log in to your workspace
       </p>
 
-      {googleBusy && <GoogleProgress />}
+      {/* One loader from the moment they log in (or the Google popup closes)
+          until the dashboard has loaded: the dashboard shows the same one
+          while ?welcome=1 is on its address. */}
+      {(submitting || googleBusy) && <LogoLoader page cover title={WELCOME_TITLE} label={WELCOME_LOADING} />}
       <form
         onSubmit={submit}
         noValidate

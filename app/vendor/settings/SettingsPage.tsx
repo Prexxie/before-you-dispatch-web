@@ -39,11 +39,15 @@ export default function SettingsPage() {
       businessCategory={vendor ? VENDOR_CATEGORY_LABELS[vendor.category] : null}
       themeColor={vendor?.themeColor}
     >
-      <p className="eyebrow">Workspace</p>
-      <h1 className="h1">Settings</h1>
-      <p className="sub">Manage your business profile and your account.</p>
-
-      {state.kind === "loading" && <LogoLoader />}
+      {state.kind === "loading" ? (
+        <LogoLoader page />
+      ) : (
+        <>
+          <p className="eyebrow">Workspace</p>
+          <h1 className="h1">Settings</h1>
+          <p className="sub">Manage your business profile and your account.</p>
+        </>
+      )}
       {state.kind === "error" && (
         <p className="sub" role="alert">
           We couldn&apos;t load your settings. Check your connection.

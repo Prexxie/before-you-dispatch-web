@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import GoogleButton, { GoogleProgress } from "@/components/GoogleButton";
 import LogoPicker from "@/components/LogoPicker";
+import LogoLoader from "@/components/LogoLoader";
 
 // A Google user who has no account yet: what the API verified about them,
 // carried to the business-details step.
@@ -176,7 +177,7 @@ function AccountStep({
       const result = await googleSignIn(credential);
       if (result.status === "signed_in") {
         // They already had an account: just sign them in.
-        window.location.href = "/vendor";
+        window.location.href = "/vendor?welcome=1";
         return;
       }
       onGoogle({ ticket: result.ticket, email: result.email, name: result.name });
@@ -331,7 +332,7 @@ function WorkspaceStep({
         businessAddress: address,
         logoDataUrl: logoDataUrl ?? undefined,
       });
-      window.location.href = "/vendor";
+      window.location.href = "/vendor?welcome=1";
     } catch (err) {
       if (err instanceof ValidationError) {
         // A field the account step already checked (e.g. a duplicate
@@ -392,6 +393,7 @@ function WorkspaceStep({
           required
         />
 
+        {submitting && <LogoLoader page cover label="Creating your account…" />}
         <button type="submit" disabled={submitting} className="btn btn-primary btn-block">
           {submitting ? "Creating account…" : "Continue to Dashboard"}
         </button>
@@ -448,7 +450,7 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
         businessAddress: businessAddress.trim(),
         logoDataUrl: logoDataUrl ?? undefined,
       });
-      window.location.href = "/vendor";
+      window.location.href = "/vendor?welcome=1";
     } catch (err) {
       if (err instanceof ValidationError && err.fields.includes("ticket")) {
         setExpired(true);
@@ -564,6 +566,7 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
           required
         />
 
+        {submitting && <LogoLoader page cover label="Creating your account…" />}
         <button type="submit" disabled={submitting} className="btn btn-primary btn-block">
           {submitting ? "Creating account…" : "Continue to Dashboard"}
         </button>

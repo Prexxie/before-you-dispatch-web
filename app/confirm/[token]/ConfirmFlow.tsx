@@ -548,7 +548,7 @@ function StatusScreen({
             eyebrow: `Hi ${first}`,
             title: `${rider} is collecting your order`,
             sub: `${rider} is on the way to ${vendor} to pick up your order. This page updates as soon as they have it.`,
-            badge: ["badge-outline", "Rider sent"],
+            badge: ["badge-info", "Rider sent"],
           }
         : screens[details.status as keyof typeof screens];
 
