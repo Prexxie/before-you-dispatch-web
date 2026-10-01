@@ -1,0 +1,24 @@
+# Render Blueprint for the WakaRoute web app (Render dashboard > New > Blueprint).
+# Deploy the API first: API_URL below is its address.
+services:
+  - type: web
+    name: wakaroute-web
+    runtime: node
+    # free sleeps after 15 min idle; use starter (paid) for the demo.
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: yarn install --frozen-lockfile && yarn build
+    # next start listens on Render's PORT automatically.
+    startCommand: yarn start
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # The API's Render address, e.g. https://wakaroute-api.onrender.com
+      # (no trailing slash). Read at BUILD time (the /api proxy is baked into
+      # the build), so after changing it, redeploy.
+      - key: API_URL
+        sync: false
+      # Same value as the API's GOOGLE_CLIENT_ID. Also read at build time.
+      - key: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+        sync: false
