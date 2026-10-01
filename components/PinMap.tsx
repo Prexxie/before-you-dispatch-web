@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import L from "leaflet";
 import {
   MapContainer,
@@ -10,6 +10,7 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import { MAP_PIN_SVG } from "./icons";
 
 export type LatLng = { lat: number; lng: number };
 
@@ -18,17 +19,28 @@ type Props = {
   // Bumped whenever the map should pan to the pin (geolocation, search);
   // dragging the pin doesn't bump it, so the map stays put while fine-tuning.
   recenterKey: number;
-  onPinChange: (pin: LatLng) => void;
+  onPinChange?: (pin: LatLng) => void;
+  // "Drag to your exact spot" label above the pin (design: Pin + Landmark).
+  showTip?: boolean;
+  // Rider's view: the pin can't be moved.
+  readOnly?: boolean;
 };
 
-// Leaflet's default marker images don't survive bundling, so draw the pin
-// with CSS instead.
-const pinIcon = L.divIcon({
-  className: "",
-  html: '<div style="width:28px;height:28px;border-radius:50% 50% 50% 0;background:#dc2626;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);transform:rotate(-45deg)"></div>',
-  iconSize: [28, 28],
-  iconAnchor: [14, 28],
-});
+// The design's crimson pin, drawn as HTML so it survives bundling (Leaflet's
+// default marker images don't). Anchored at the pin's point.
+function pinIcon(showTip: boolean) {
+  const tip = showTip
+    ? '<span class="map-pin-tip" style="margin-bottom:6px">Drag to your exact spot</span>'
+    : "";
+  return L.divIcon({
+    className: "",
+    html: `<div style="position:absolute;left:0;bottom:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center">${tip}${MAP_PIN_SVG}</div>`,
+    // Zero-size anchor element at the location; the pin hangs above it. The
+    // pin's point is 3px above the SVG's bottom edge, hence the -3.
+    iconSize: [0, 0],
+    iconAnchor: [0, -3],
+  });
+}
 
 function Recenter({ pin, recenterKey }: Pick<Props, "pin" | "recenterKey">) {
   const map = useMap();
@@ -40,38 +52,64 @@ function Recenter({ pin, recenterKey }: Pick<Props, "pin" | "recenterKey">) {
   return null;
 }
 
-function TapToMove({ onPinChange }: Pick<Props, "onPinChange">) {
+// The map stays mounted (hidden) while the customer goes back a step, so their
+// pin and notes are still there when they come forward. Leaflet measures its
+// container once, so re-measure whenever it changes size, such as when it is
+// shown again.
+function InvalidateOnResize() {
+  const map = useMap();
+  useEffect(() => {
+    const el = map.getContainer();
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [map]);
+  return null;
+}
+
+function TapToMove({ onPinChange }: { onPinChange: (pin: LatLng) => void }) {
   useMapEvents({
     click: (e) => onPinChange({ lat: e.latlng.lat, lng: e.latlng.lng }),
   });
   return null;
 }
 
-export default function PinMap({ pin, recenterKey, onPinChange }: Props) {
+// The page draws the zoom-free chrome from the design (search, locate,
+// chip, attribution) over this map; pinch, scroll and double-tap still zoom.
+export default function PinMap({
+  pin,
+  recenterKey,
+  onPinChange,
+  showTip = false,
+  readOnly = false,
+}: Props) {
+  const editable = !readOnly && onPinChange !== undefined;
+  const icon = useMemo(() => pinIcon(showTip), [showTip]);
   return (
     <MapContainer
       center={[pin.lat, pin.lng]}
       zoom={16}
       scrollWheelZoom
-      className="h-72 w-full rounded-lg"
+      zoomControl={false}
+      attributionControl={false}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Marker
         position={[pin.lat, pin.lng]}
-        icon={pinIcon}
-        draggable
+        icon={icon}
+        draggable={editable}
+        interactive={editable}
+        keyboard={false}
         eventHandlers={{
           dragend: (e) => {
             const { lat, lng } = (e.target as L.Marker).getLatLng();
-            onPinChange({ lat, lng });
+            onPinChange?.({ lat, lng });
           },
         }}
       />
       <Recenter pin={pin} recenterKey={recenterKey} />
-      <TapToMove onPinChange={onPinChange} />
+      <InvalidateOnResize />
+      {editable && <TapToMove onPinChange={onPinChange} />}
     </MapContainer>
   );
 }
