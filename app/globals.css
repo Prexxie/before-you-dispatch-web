@@ -1786,13 +1786,31 @@ body {
 
   @media (max-width: 900px) {
     .lp-nav {
-      padding: 0 24px;
+      padding: 0 16px;
     }
     .lp-nav-links {
       gap: 16px;
     }
     .lp-nav-links a:not(.btn) {
       display: none;
+    }
+    .lp-nav {
+      height: 64px;
+    }
+    .lp-nav .wordmark {
+      white-space: nowrap;
+      font-size: 16px;
+    }
+    .lp-nav-links {
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .lp-nav-links a.btn {
+      min-height: 38px;
+      padding: 0 14px;
+      font-size: 13.5px;
+      white-space: nowrap;
+      box-shadow: none;
     }
     .lp-hero {
       flex-direction: column;
