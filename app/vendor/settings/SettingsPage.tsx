@@ -5,10 +5,10 @@ import { FormEvent, useState } from "react";
 import {
   ThemeColor,
   UpdateVendorInput,
-  VENDOR_CATEGORY_LABELS,
   ValidationError,
   Vendor,
   VendorCategory,
+  categoryLabel,
   changePassword,
   getMe,
   updateVendorProfile,
@@ -16,6 +16,12 @@ import {
 import { THEME_COLOR_ORDER, THEME_PRESETS } from "@/lib/theme";
 import { useLiveData } from "@/lib/useLiveData";
 import LogoPicker from "@/components/LogoPicker";
+import CategoryField from "@/components/CategoryField";
+import PasswordField from "@/components/PasswordField";
+import FieldError from "@/components/FieldError";
+import { useLiveValidation } from "@/lib/useLiveValidation";
+import PasswordRules from "@/components/PasswordRules";
+import { PASSWORD_ERROR, PHONE_ERROR, isStrongPassword, isValidPhone } from "@/lib/validate";
 import AppShell from "@/components/AppShell";
 import { CheckIcon } from "@/components/icons";
 
@@ -36,7 +42,7 @@ export default function SettingsPage() {
       active="settings"
       title="Settings"
       businessName={vendor?.businessName ?? null}
-      businessCategory={vendor ? VENDOR_CATEGORY_LABELS[vendor.category] : null}
+      businessCategory={vendor ? categoryLabel(vendor) : null}
       themeColor={vendor?.themeColor}
     >
       {state.kind === "loading" ? (
@@ -95,8 +101,8 @@ function ProfileCard({ vendor, onSaved }: { vendor: Vendor; onSaved: () => void 
         <span className="readonly-val">{vendor.ownerName}</span>
       </div>
       <div className="readonly-row">
-        <span className="readonly-label">WHAT YOU SELL</span>
-        <span className="readonly-val">{VENDOR_CATEGORY_LABELS[vendor.category]}</span>
+        <span className="readonly-label">BUSINESS TYPE</span>
+        <span className="readonly-val">{categoryLabel(vendor)}</span>
       </div>
       <div className="readonly-row">
         <span className="readonly-label">ADDRESS</span>
@@ -118,7 +124,12 @@ function ProfileCard({ vendor, onSaved }: { vendor: Vendor; onSaved: () => void 
   );
 }
 
-type ProfileFormFields = "businessName" | "ownerName" | "businessAddress";
+type ProfileFormFields =
+  | "businessName"
+  | "ownerName"
+  | "businessAddress"
+  | "businessPhone"
+  | "categoryOther";
 
 function ProfileEditForm({
   vendor,
@@ -132,25 +143,28 @@ function ProfileEditForm({
   const [businessName, setBusinessName] = useState(vendor.businessName);
   const [ownerName, setOwnerName] = useState(vendor.ownerName);
   const [category, setCategory] = useState<VendorCategory>(vendor.category);
+  const [categoryOther, setCategoryOther] = useState(vendor.categoryOther ?? "");
   const [businessAddress, setBusinessAddress] = useState(vendor.businessAddress);
   const [businessPhone, setBusinessPhone] = useState(vendor.businessPhone ?? "");
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(vendor.logoUrl);
-  const [fieldErrors, setFieldErrors] = useState<ProfileFormFields[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Errors the API reported for fields the form's own checks can't know
+  // about; cleared as soon as that field is edited.
+  const [serverFields, setServerFields] = useState<ProfileFormFields[]>([]);
+
+  const errors: Partial<Record<ProfileFormFields | "category", string>> = {};
+  if (!businessName.trim()) errors.businessName = "Enter your business name.";
+  if (!ownerName.trim()) errors.ownerName = "Enter the owner's name.";
+  if (!businessAddress.trim()) errors.businessAddress = "Enter your business address.";
+  if (businessPhone.trim() && !isValidPhone(businessPhone)) errors.businessPhone = PHONE_ERROR;
+  if (category === "other" && !categoryOther.trim()) errors.categoryOther = "Tell us your business type.";
+  const live = useLiveValidation<ProfileFormFields | "category">(errors);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const bad: ProfileFormFields[] = [];
-    if (!businessName.trim()) bad.push("businessName");
-    if (!ownerName.trim()) bad.push("ownerName");
-    if (!businessAddress.trim()) bad.push("businessAddress");
-    setFieldErrors(bad);
-    if (bad.length > 0) {
-      setError("Check the fields marked below.");
-      return;
-    }
+    if (!live.validateAll()) return;
 
     setSubmitting(true);
     try {
@@ -158,6 +172,7 @@ function ProfileEditForm({
         businessName: businessName.trim(),
         ownerName: ownerName.trim(),
         category,
+        categoryOther: category === "other" ? categoryOther.trim() : "",
         businessAddress: businessAddress.trim(),
         businessPhone: businessPhone.trim(),
       };
@@ -168,7 +183,7 @@ function ProfileEditForm({
       onSaved();
     } catch (err) {
       if (err instanceof ValidationError) {
-        setFieldErrors(err.fields as ProfileFormFields[]);
+        setServerFields(err.fields as ProfileFormFields[]);
         setError(err.message);
       } else {
         setError("Couldn't save. Check your connection and try again.");
@@ -178,7 +193,10 @@ function ProfileEditForm({
     }
   }
 
-  const invalid = (field: ProfileFormFields) => fieldErrors.includes(field);
+  const invalid = (field: ProfileFormFields) =>
+    !!live.error(field) || serverFields.includes(field);
+  const edited = (field: ProfileFormFields) =>
+    setServerFields((f) => f.filter((x) => x !== field));
 
   return (
     <form onSubmit={submit} noValidate className="card">
@@ -195,10 +213,16 @@ function ProfileEditForm({
         id="businessName"
         className="field"
         value={businessName}
-        onChange={(e) => setBusinessName(e.target.value)}
+        onChange={(e) => {
+          setBusinessName(e.target.value);
+          edited("businessName");
+        }}
+        onBlur={live.onBlur("businessName")}
         aria-invalid={invalid("businessName")}
+        aria-describedby={live.error("businessName") ? "businessName-error" : undefined}
         required
       />
+      <FieldError id="businessName" message={live.error("businessName")} />
 
       <label className="field-label" htmlFor="ownerName">
         Owner name
@@ -207,26 +231,31 @@ function ProfileEditForm({
         id="ownerName"
         className="field"
         value={ownerName}
-        onChange={(e) => setOwnerName(e.target.value)}
+        onChange={(e) => {
+          setOwnerName(e.target.value);
+          edited("ownerName");
+        }}
+        onBlur={live.onBlur("ownerName")}
         aria-invalid={invalid("ownerName")}
+        aria-describedby={live.error("ownerName") ? "ownerName-error" : undefined}
         required
       />
+      <FieldError id="ownerName" message={live.error("ownerName")} />
 
-      <label className="field-label" htmlFor="category">
-        What do you sell?
-      </label>
-      <select
-        id="category"
-        className="field"
-        value={category}
-        onChange={(e) => setCategory(e.target.value as VendorCategory)}
-      >
-        {Object.entries(VENDOR_CATEGORY_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
+      <CategoryField
+        category={category}
+        categoryOther={categoryOther}
+        onCategory={(c) => {
+          setCategory(c as VendorCategory);
+          edited("categoryOther");
+        }}
+        onCategoryOther={(t) => {
+          setCategoryOther(t);
+          edited("categoryOther");
+        }}
+        otherError={live.error("categoryOther")}
+        onBlurOther={live.onBlur("categoryOther")}
+      />
 
       <label className="field-label" htmlFor="businessAddress">
         Business address
@@ -235,10 +264,16 @@ function ProfileEditForm({
         id="businessAddress"
         className="field"
         value={businessAddress}
-        onChange={(e) => setBusinessAddress(e.target.value)}
+        onChange={(e) => {
+          setBusinessAddress(e.target.value);
+          edited("businessAddress");
+        }}
+        onBlur={live.onBlur("businessAddress")}
         aria-invalid={invalid("businessAddress")}
+        aria-describedby={live.error("businessAddress") ? "businessAddress-error" : undefined}
         required
       />
+      <FieldError id="businessAddress" message={live.error("businessAddress")} />
 
       <label className="field-label" htmlFor="businessPhone">
         Business phone (optional)
@@ -248,7 +283,18 @@ function ProfileEditForm({
         className="field"
         type="tel"
         value={businessPhone}
-        onChange={(e) => setBusinessPhone(e.target.value)}
+        onChange={(e) => {
+          setBusinessPhone(e.target.value);
+          edited("businessPhone");
+        }}
+        onBlur={live.onBlur("businessPhone")}
+        placeholder="e.g. 0803 123 4567"
+        aria-invalid={invalid("businessPhone")}
+        aria-describedby={invalid("businessPhone") ? "businessPhone-error" : undefined}
+      />
+      <FieldError
+        id="businessPhone"
+        message={live.error("businessPhone") ?? (serverFields.includes("businessPhone") ? PHONE_ERROR : undefined)}
       />
 
       <div className="row-flex">
@@ -377,28 +423,25 @@ function ChangePasswordForm({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // E.g. "Current password is incorrect" from the API; cleared on edit.
+  const [serverFields, setServerFields] = useState<string[]>([]);
+
+  type PField = "currentPassword" | "newPassword" | "confirmPassword";
+  const errors: Partial<Record<PField, string>> = {};
+  // An account made with Google has no current password to check.
+  if (hasPassword && !currentPassword) errors.currentPassword = "Enter your current password.";
+  if (!isStrongPassword(newPassword)) errors.newPassword = PASSWORD_ERROR;
+  if (!confirmPassword) errors.confirmPassword = "Type the new password again.";
+  else if (newPassword !== confirmPassword) errors.confirmPassword = "The two passwords don't match.";
+  const live = useLiveValidation<PField>(errors);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const bad: string[] = [];
-    // An account made with Google has no current password to check.
-    if (hasPassword && !currentPassword) bad.push("currentPassword");
-    if (newPassword.length < 8) bad.push("newPassword");
-    if (newPassword !== confirmPassword) bad.push("confirmPassword");
-    setFieldErrors(bad);
-    if (bad.length > 0) {
-      setError(
-        bad.includes("confirmPassword") && newPassword.length >= 8
-          ? "New password and confirmation don't match."
-          : "Check the fields marked below.",
-      );
-      return;
-    }
+    if (!live.validateAll()) return;
 
     setSubmitting(true);
     try {
@@ -406,7 +449,7 @@ function ChangePasswordForm({
       setDone(true);
     } catch (err) {
       if (err instanceof ValidationError) {
-        setFieldErrors(err.fields);
+        setServerFields(err.fields);
         setError(err.message);
       } else {
         setError("Couldn't change your password. Check your connection and try again.");
@@ -416,7 +459,7 @@ function ChangePasswordForm({
     }
   }
 
-  const invalid = (field: string) => fieldErrors.includes(field);
+  const invalid = (field: PField) => !!live.error(field) || serverFields.includes(field);
 
   if (done) {
     return (
@@ -445,16 +488,20 @@ function ChangePasswordForm({
           <label className="field-label" htmlFor="currentPassword">
             Current password
           </label>
-          <input
+          <PasswordField
             id="currentPassword"
-            className="field"
-            type="password"
             autoComplete="current-password"
             value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
+            onChange={(e) => {
+              setCurrentPassword(e.target.value);
+              setServerFields([]);
+            }}
+            onBlur={live.onBlur("currentPassword")}
             aria-invalid={invalid("currentPassword")}
+            aria-describedby={live.error("currentPassword") ? "currentPassword-error" : undefined}
             required
           />
+          <FieldError id="currentPassword" message={live.error("currentPassword")} />
         </>
       ) : (
         <p className="sub" style={{ marginBottom: 18 }}>
@@ -466,31 +513,32 @@ function ChangePasswordForm({
       <label className="field-label" htmlFor="newPassword">
         New password
       </label>
-      <input
+      <PasswordField
         id="newPassword"
-        className="field"
-        type="password"
         autoComplete="new-password"
         value={newPassword}
         onChange={(e) => setNewPassword(e.target.value)}
-        placeholder="At least 8 characters"
+        onBlur={live.onBlur("newPassword")}
+        placeholder="Create a strong password"
         aria-invalid={invalid("newPassword")}
         required
       />
+      <PasswordRules password={newPassword} />
 
       <label className="field-label" htmlFor="confirmPassword">
         Confirm new password
       </label>
-      <input
+      <PasswordField
         id="confirmPassword"
-        className="field"
-        type="password"
         autoComplete="new-password"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
+        onBlur={live.onBlur("confirmPassword")}
         aria-invalid={invalid("confirmPassword")}
+        aria-describedby={live.error("confirmPassword") ? "confirmPassword-error" : undefined}
         required
       />
+      <FieldError id="confirmPassword" message={live.error("confirmPassword")} />
 
       <div className="row-flex">
         <button type="button" onClick={onCancel} disabled={submitting} className="btn btn-secondary">

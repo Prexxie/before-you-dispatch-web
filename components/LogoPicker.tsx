@@ -14,10 +14,13 @@ export default function LogoPicker({
   value,
   onChange,
   label = "Add a business photo or logo",
+  changeLabel = "Change business photo or logo",
 }: {
   value: string | null;
   onChange: (dataUrl: string | null) => void;
   label?: string;
+  // Screen-reader name of the button once a photo is set.
+  changeLabel?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -48,7 +51,7 @@ export default function LogoPicker({
         type="button"
         className="logo-circle"
         onClick={() => fileInput.current?.click()}
-        aria-label={value ? "Change business photo or logo" : label}
+        aria-label={value ? changeLabel : label}
       >
         {value ? (
           // eslint-disable-next-line @next/next/no-img-element -- a
@@ -81,6 +84,16 @@ export default function LogoPicker({
       <span style={{ fontSize: 12.5, color: "var(--ink-faint)", fontWeight: 600 }}>
         {label} (optional)
       </span>
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className="underline"
+          style={{ fontSize: 12.5, marginTop: 4 }}
+        >
+          Remove photo
+        </button>
+      )}
       {error && (
         <p className="mt-1 text-sm font-semibold text-danger" role="alert">
           {error}

@@ -11,7 +11,8 @@ import {
   createOrder,
   getRiders,
 } from "@/lib/api";
-import { toWhatsAppNumber } from "@/lib/links";
+import { useLiveValidation } from "@/lib/useLiveValidation";
+import { PHONE_ERROR, isValidPhone } from "@/lib/validate";
 import {
   PackageIcon,
   PersonIcon,
@@ -30,7 +31,7 @@ const EMPTY_FORM: CreateOrderInput = {
 
 const FIELD_MESSAGES: Record<Field, string> = {
   customerName: "Enter the customer's name.",
-  customerPhone: "Enter a phone number, e.g. 0803 123 4567.",
+  customerPhone: PHONE_ERROR,
   itemDescription: "Say what's being delivered.",
   riderId: "Choose a rider.",
 };
@@ -41,13 +42,12 @@ const VEHICLE_LABELS: Record<Vehicle, string> = {
   van: "Van",
 };
 
-// Mirrors the API's isValidPhone, so most mistakes are caught before sending.
+// Mirrors the API's checks, so most mistakes are caught before sending.
 function checkForm(form: CreateOrderInput): Field[] {
   const bad = (Object.keys(form) as Field[]).filter(
     (field) => form[field].trim() === "",
   );
-  const digits = toWhatsAppNumber(form.customerPhone).length;
-  if (!bad.includes("customerPhone") && (digits < 10 || digits > 15)) {
+  if (!bad.includes("customerPhone") && !isValidPhone(form.customerPhone)) {
     bad.push("customerPhone");
   }
   return bad;
@@ -64,7 +64,9 @@ export default function CreateOrderFlow() {
   const router = useRouter();
   const [riders, setRiders] = useState<RidersState>({ kind: "loading" });
   const [form, setForm] = useState(EMPTY_FORM);
-  const [fieldErrors, setFieldErrors] = useState<Field[]>([]);
+  // Fields the API rejected that the form's own checks passed; cleared when
+  // that field is edited.
+  const [serverFields, setServerFields] = useState<Field[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -78,15 +80,18 @@ export default function CreateOrderFlow() {
 
   function update(field: Field, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
-    setFieldErrors((errs) => errs.filter((e) => e !== field));
+    setServerFields((errs) => errs.filter((e) => e !== field));
   }
+
+  // Errors show as each field is left, then update as the person types.
+  const live = useLiveValidation<Field>(
+    Object.fromEntries(checkForm(form).map((f) => [f, FIELD_MESSAGES[f]])),
+  );
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setSubmitError(null);
-    const bad = checkForm(form);
-    setFieldErrors(bad);
-    if (bad.length > 0) return;
+    if (!live.validateAll()) return;
 
     setSubmitting(true);
     try {
@@ -95,7 +100,7 @@ export default function CreateOrderFlow() {
       router.push(`/vendor/orders/${order.id}`);
     } catch (err) {
       if (err instanceof ValidationError) {
-        setFieldErrors(err.fields as Field[]);
+        setServerFields(err.fields as Field[]);
         setSubmitError(err.message);
       } else {
         setSubmitError(
@@ -106,7 +111,7 @@ export default function CreateOrderFlow() {
     }
   }
 
-  const invalid = (field: Field) => fieldErrors.includes(field);
+  const invalid = (field: Field) => !!live.error(field) || serverFields.includes(field);
   const errorFor = (field: Field) =>
     invalid(field) ? (
       <p id={`${field}-error`} className="field-error">
@@ -116,6 +121,7 @@ export default function CreateOrderFlow() {
   const a11y = (field: Field) => ({
     "aria-invalid": invalid(field),
     "aria-describedby": invalid(field) ? `${field}-error` : undefined,
+    onBlur: live.onBlur(field),
   });
 
   const noRiders = riders.kind === "ready" && riders.riders.length === 0;

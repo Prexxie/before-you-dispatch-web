@@ -4,6 +4,9 @@ import Link from "next/link";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { FormEvent, useState } from "react";
 import { ValidationError, requestPasswordReset } from "@/lib/api";
+import { EMAIL_ERROR, isValidEmail } from "@/lib/validate";
+import FieldError from "@/components/FieldError";
+import { useLiveValidation } from "@/lib/useLiveValidation";
 
 // No screen for this exists in the design; built in the style of Log In.
 export default function ForgotPasswordForm() {
@@ -11,10 +14,18 @@ export default function ForgotPasswordForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const live = useLiveValidation<"email">({
+    email: !email.trim()
+      ? "Enter your email address."
+      : isValidEmail(email)
+        ? undefined
+        : EMAIL_ERROR,
+  });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!live.validateAll()) return;
     setSubmitting(true);
     try {
       await requestPasswordReset(email.trim());
@@ -85,9 +96,13 @@ export default function ForgotPasswordForm() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onBlur={live.onBlur("email")}
+          aria-invalid={!!live.error("email")}
+          aria-describedby={live.error("email") ? "email-error" : undefined}
           placeholder="you@business.com"
           required
         />
+        <FieldError id="email" message={live.error("email")} />
         <button type="submit" disabled={submitting} className="btn btn-primary btn-block">
           {submitting ? "Sending…" : "Send Reset Link"}
         </button>

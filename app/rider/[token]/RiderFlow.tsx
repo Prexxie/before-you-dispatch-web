@@ -1,5 +1,6 @@
 "use client";
 
+import { MAP_ATTRIBUTION, MAP_ATTRIBUTION_URL } from "@/lib/mapConfig";
 import LogoLoader from "@/components/LogoLoader";
 import dynamic from "next/dynamic";
 import { useState } from "react";
@@ -350,11 +351,11 @@ function EnRouteScreen({
         <a
           className="map-attrib"
           style={{ bottom: 8 }}
-          href="https://www.openstreetmap.org/copyright"
+          href={MAP_ATTRIBUTION_URL}
           target="_blank"
           rel="noopener noreferrer"
         >
-          &copy; OpenStreetMap
+          {MAP_ATTRIBUTION}
         </a>
       </div>
 

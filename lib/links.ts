@@ -20,6 +20,8 @@ export function toWhatsAppNumber(phone: string): string {
   if (digits.length === 11 && digits.startsWith("0")) {
     return `234${digits.slice(1)}`;
   }
+  // "803 123 4567": the leading 0 left off.
+  if (digits.length === 10 && /^[789]/.test(digits)) return `234${digits}`;
   return digits;
 }
 
@@ -64,8 +66,9 @@ export function customerMessage(
   sender: string | null = null,
 ): string {
   const business = vendor?.name ?? "your delivery business";
+  // The 📍 marks the business's address in the message.
   const contact = vendor
-    ? ` (${[vendor.address, vendor.phone].filter(Boolean).join(", ")})`
+    ? ` (${[vendor.address && `📍 ${vendor.address}`, vendor.phone].filter(Boolean).join(", ")})`
     : "";
   const who = `this is ${sender ? `${sender} from ` : ""}${business}${contact}`;
   const name = firstName(order.customerName);

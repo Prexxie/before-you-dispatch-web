@@ -94,6 +94,8 @@ export type Rider = {
   name: string;
   phone: string;
   vehicle: Vehicle | null;
+  // A small "data:image/..." photo, if the vendor added one.
+  photoUrl?: string | null;
   active: boolean;
 };
 
@@ -101,7 +103,13 @@ export type CreateRiderInput = {
   name: string;
   phone: string;
   vehicle: Vehicle;
+  // From the photo picker, if one was set.
+  photoDataUrl?: string;
 };
+
+// Edit a rider: only the fields present change; photoDataUrl clears the
+// photo when sent as "".
+export type UpdateRiderInput = Partial<CreateRiderInput>;
 
 export type CreateOrderInput = {
   customerName: string;
@@ -233,6 +241,9 @@ export class ValidationError extends Error {
   constructor(
     message: string,
     public fields: string[],
+    // The API's machine-readable reason when it sends one, e.g.
+    // "google_account" for an email that only has Google sign-in.
+    public code?: string,
   ) {
     super(message);
   }
@@ -269,6 +280,20 @@ export async function createRider(input: CreateRiderInput): Promise<Rider> {
     throw new ValidationError(body.error, body.fields ?? []);
   }
   if (!res.ok) throw new Error(`POST riders failed: ${res.status}`);
+  return res.json();
+}
+
+export async function updateRider(id: string, input: UpdateRiderInput): Promise<Rider> {
+  const res = await vendorFetch(`/riders/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 400) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`PATCH rider failed: ${res.status}`);
   return res.json();
 }
 
@@ -576,23 +601,46 @@ export function redeliverOrder(id: string, riderId?: string): Promise<VendorOrde
 // Vendor accounts (real sign-in, ahead of first deploy — replaces the
 // earlier plan for a shared passcode).
 
-// A rough sense of what the vendor sells (design: "What do you sell?").
-// Account context only — not shown to customers or riders, and no feature
-// logic depends on it yet.
+// What kind of business the vendor runs (design: "What kind of business do
+// you run?"). Account context only — not shown to customers or riders, and
+// no feature logic depends on it yet. Order here is the dropdown's order;
+// "Other" stays last and comes with the vendor's own words (categoryOther).
 export type VendorCategory =
-  | "retail_ecommerce"
   | "food_restaurant"
+  | "ecommerce"
+  | "retail_store"
+  | "courier_dispatch"
+  | "phones_gadgets"
   | "pharmacy"
-  | "delivery_logistics"
+  | "fashion_clothing"
+  | "hair_beauty"
+  | "health_wellness"
   | "other";
 
 export const VENDOR_CATEGORY_LABELS: Record<VendorCategory, string> = {
-  retail_ecommerce: "Retail / e-commerce",
-  food_restaurant: "Food or restaurant",
+  food_restaurant: "Food / Restaurant",
+  ecommerce: "E-commerce",
+  retail_store: "Retail Store",
+  courier_dispatch: "Courier / Dispatch Service",
+  phones_gadgets: "Phones and Gadgets",
   pharmacy: "Pharmacy",
-  delivery_logistics: "Delivery / logistics / dispatch company",
+  fashion_clothing: "Fashion / Clothing",
+  hair_beauty: "Hair / Beauty",
+  health_wellness: "Health / Wellness",
   other: "Other",
 };
+
+export const MAX_CATEGORY_OTHER_LENGTH = 60;
+
+// "Pharmacy", or for "Other" what the vendor typed ("Bakery").
+export function categoryLabel(vendor: {
+  category: VendorCategory;
+  categoryOther?: string | null;
+}): string {
+  return vendor.category === "other" && vendor.categoryOther
+    ? vendor.categoryOther
+    : VENDOR_CATEGORY_LABELS[vendor.category];
+}
 
 // A cosmetic accent for the vendor's own dashboard (design: "Vendor:
 // Settings", Workspace theme). Never seen by customers or riders.
@@ -614,6 +662,8 @@ export type Vendor = {
   logoUrl: string | null;
   ownerName: string;
   category: VendorCategory;
+  // What the vendor typed when category is "other"; null otherwise.
+  categoryOther: string | null;
   themeColor: ThemeColor;
   email: string;
   // false for an account made with Google that never set a password.
@@ -629,6 +679,8 @@ export type SignUpInput = {
   logoDataUrl?: string;
   ownerName: string;
   category: VendorCategory | "";
+  // Required when category is "other".
+  categoryOther?: string;
   email: string;
   password: string;
 };
@@ -644,29 +696,52 @@ export async function signUp(input: SignUpInput): Promise<Vendor> {
     body: JSON.stringify(input),
   });
   if (res.status === 400 || res.status === 409) {
-    const body: { error: string; fields?: string[] } = await res.json();
-    throw new ValidationError(body.error, body.fields ?? []);
+    const body: { error: string; fields?: string[]; code?: string } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? [], body.code);
   }
   if (!res.ok) throw new Error(`POST signup failed: ${res.status}`);
-  return res.json();
+  return rememberTheme(await res.json());
 }
 
+// A bad email is a 400; a wrong password, or an account that only has Google
+// sign-in (code "google_account"), is a 401.
 export async function logIn(email: string, password: string): Promise<Vendor> {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  if (res.status === 401) {
-    const body: { error: string } = await res.json();
-    throw new ValidationError(body.error, []);
+  if (res.status === 400 || res.status === 401) {
+    const body: { error: string; fields?: string[]; code?: string } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? [], body.code);
   }
   if (!res.ok) throw new Error(`POST login failed: ${res.status}`);
-  return res.json();
+  return rememberTheme(await res.json());
 }
 
 export async function logOut(): Promise<void> {
   await fetch(`${API_URL}/auth/logout`, { method: "POST" });
+  forgetTheme();
+}
+
+// The vendor's accent colour, remembered in a cookie so the next page load
+// can paint it from the very first frame (app/vendor/layout.tsx reads it on
+// the server) instead of showing the default green until /auth/me answers.
+// Just a cosmetic preference: the account's themeColor stays the truth and
+// replaces this whenever it loads.
+export const THEME_COOKIE = "byd_theme";
+
+function rememberTheme(vendor: Vendor): Vendor {
+  if (typeof document !== "undefined") {
+    document.cookie = `${THEME_COOKIE}=${vendor.themeColor}; path=/; max-age=31536000; samesite=lax`;
+  }
+  return vendor;
+}
+
+function forgetTheme() {
+  if (typeof document !== "undefined") {
+    document.cookie = `${THEME_COOKIE}=; path=/; max-age=0; samesite=lax`;
+  }
 }
 
 // Restores the session on load. Resolves to null rather than throwing when
@@ -675,7 +750,7 @@ export async function getMe(): Promise<Vendor | null> {
   const res = await fetch(`${API_URL}/auth/me`, { cache: "no-store" });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error(`GET me failed: ${res.status}`);
-  return res.json();
+  return rememberTheme(await res.json());
 }
 
 // The "Edit Profile" form (design: "Vendor: Settings"). Only the fields
@@ -688,6 +763,8 @@ export type UpdateVendorInput = Partial<{
   logoDataUrl: string;
   ownerName: string;
   category: VendorCategory;
+  // Sent with category; required when it's "other".
+  categoryOther: string;
   themeColor: ThemeColor;
 }>;
 
@@ -702,7 +779,7 @@ export async function updateVendorProfile(input: UpdateVendorInput): Promise<Ven
     throw new ValidationError(body.error, body.fields ?? []);
   }
   if (!res.ok) throw new Error(`PATCH auth/me failed: ${res.status}`);
-  return res.json();
+  return rememberTheme(await res.json());
 }
 
 // Plain fetch, not vendorFetch: a 401 here means "wrong current password",
@@ -769,7 +846,9 @@ export async function googleSignIn(credential: string): Promise<GoogleSignInResu
     throw new ValidationError(body.error, []);
   }
   if (!res.ok) throw new Error(`POST google failed: ${res.status}`);
-  return res.json();
+  const result: GoogleSignInResult = await res.json();
+  if (result.status === "signed_in") rememberTheme(result.vendor);
+  return result;
 }
 
 export type GoogleSignUpInput = {
@@ -780,6 +859,7 @@ export type GoogleSignUpInput = {
   logoDataUrl?: string;
   ownerName: string;
   category: VendorCategory | "";
+  categoryOther?: string;
 };
 
 export async function googleSignUp(input: GoogleSignUpInput): Promise<Vendor> {
@@ -793,5 +873,5 @@ export async function googleSignUp(input: GoogleSignUpInput): Promise<Vendor> {
     throw new ValidationError(body.error, body.fields ?? []);
   }
   if (!res.ok) throw new Error(`POST google/signup failed: ${res.status}`);
-  return res.json();
+  return rememberTheme(await res.json());
 }

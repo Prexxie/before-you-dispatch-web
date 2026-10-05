@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Dashboard from "./Dashboard";
+import ThemeScope from "@/components/ThemeScope";
 
 export const metadata: Metadata = { title: "Dashboard · WakaRoute" };
 
@@ -10,5 +11,9 @@ export default async function VendorPage({
 }) {
   // Straight from logging in: keep the login's welcome loader up.
   const { welcome } = await searchParams;
-  return <Dashboard welcome={welcome === "1"} />;
+  return (
+    <ThemeScope>
+      <Dashboard welcome={welcome === "1"} />
+    </ThemeScope>
+  );
 }

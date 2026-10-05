@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import {
   OrderList,
   OrderStatus,
-  VENDOR_CATEGORY_LABELS,
+  categoryLabel,
   VendorInfo,
   getMe,
   getOrders,
@@ -43,7 +43,7 @@ export default function Dashboard({ welcome = false }: { welcome?: boolean }) {
   );
   const data = state.kind === "ready" ? state.data : null;
   const [meState] = useLiveData(() => getMe(), "dashboard-me");
-  const category = meState.kind === "ready" ? meState.data?.category : null;
+  const me = meState.kind === "ready" ? meState.data : null;
   const themeColor = meState.kind === "ready" ? meState.data?.themeColor : undefined;
 
   function changeFilter(next: Filter) {
@@ -56,7 +56,7 @@ export default function Dashboard({ welcome = false }: { welcome?: boolean }) {
       active="dashboard"
       title="Dashboard"
       businessName={data?.vendorName ?? null}
-      businessCategory={category ? VENDOR_CATEGORY_LABELS[category] : null}
+      businessCategory={me ? categoryLabel(me) : null}
       themeColor={themeColor}
     >
       {state.kind !== "loading" && <BusinessHeader vendor={data?.vendor ?? null} />}
