@@ -1,5 +1,6 @@
 "use client";
 
+import { MAP_ATTRIBUTION, MAP_ATTRIBUTION_URL } from "@/lib/mapConfig";
 import dynamic from "next/dynamic";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import type { LatLng } from "@/components/PinMap";
@@ -256,11 +257,11 @@ function ReviewSavedLocation({
         <a
           className="map-attrib"
           style={{ right: 16 }}
-          href="https://www.openstreetmap.org/copyright"
+          href={MAP_ATTRIBUTION_URL}
           target="_blank"
           rel="noopener noreferrer"
         >
-          &copy; OpenStreetMap
+          {MAP_ATTRIBUTION}
         </a>
       </div>
       <div className="summary">
@@ -391,10 +392,17 @@ function PinEditor({
     searchAbort.current = ctrl;
     setSearching(true);
     // Favour places near the pin (the customer's spot, or Lagos).
-    const found = await (full ? searchPlaces : suggestPlaces)(q, pin, ctrl.signal);
-    if (ctrl.signal.aborted) return;
-    setResults(found);
-    setSearching(false);
+    if (full) {
+      // Results appear as each service answers; "searching" ends when both do.
+      await searchPlaces(q, pin, ctrl.signal, (found) => {
+        if (!ctrl.signal.aborted) setResults(found);
+      });
+    } else {
+      const found = await suggestPlaces(q, pin, ctrl.signal);
+      if (ctrl.signal.aborted) return;
+      setResults(found);
+    }
+    if (!ctrl.signal.aborted) setSearching(false);
   }
 
   // Suggestions while typing (Photon, after a pause). Nominatim's usage
@@ -534,11 +542,11 @@ function PinEditor({
         )}
         <a
           className="map-attrib"
-          href="https://www.openstreetmap.org/copyright"
+          href={MAP_ATTRIBUTION_URL}
           target="_blank"
           rel="noopener noreferrer"
         >
-          &copy; OpenStreetMap
+          {MAP_ATTRIBUTION}
         </a>
         <button
           type="button"

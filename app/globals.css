@@ -428,6 +428,46 @@ body {
     font-weight: 600;
     margin: -14px 0 18px 0;
   }
+  /* Password input with a show/hide eye (components/PasswordField.tsx). The
+     input keeps its usual bottom margin, so the button is sized to the input
+     itself, not the wrapper. */
+  .password-wrap {
+    position: relative;
+  }
+  .password-wrap .field {
+    padding-right: 48px;
+  }
+  .password-toggle {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    color: var(--ink-faint);
+    cursor: pointer;
+  }
+  .password-toggle:hover,
+  .password-toggle:focus-visible {
+    color: var(--ink);
+  }
+  /* Checklist under a new-password field (components/PasswordRules.tsx). */
+  .password-rules {
+    list-style: none;
+    margin: -14px 0 20px 0;
+    padding: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-faint);
+    display: grid;
+    gap: 3px;
+  }
+  .password-rules li.ok {
+    color: var(--brand);
+  }
   .row-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -802,6 +842,13 @@ body {
     font-size: 11.5px;
     font-weight: 700;
     flex-shrink: 0;
+    overflow: hidden;
+    vertical-align: middle;
+  }
+  .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
   .pin-box {
     background:

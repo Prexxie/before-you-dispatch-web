@@ -4,6 +4,11 @@ import Link from "next/link";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { FormEvent, useState, useSyncExternalStore } from "react";
 import { ValidationError, resetPassword } from "@/lib/api";
+import FieldError from "@/components/FieldError";
+import { useLiveValidation } from "@/lib/useLiveValidation";
+import PasswordField from "@/components/PasswordField";
+import PasswordRules from "@/components/PasswordRules";
+import { PASSWORD_ERROR, isStrongPassword } from "@/lib/validate";
 
 // No screen for this exists in the design; built in the style of Log In.
 export default function ResetPasswordForm() {
@@ -21,18 +26,16 @@ export default function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [linkDead, setLinkDead] = useState(false);
   const [done, setDone] = useState(false);
+  const errors: Partial<Record<"newPassword" | "confirmPassword", string>> = {};
+  if (!isStrongPassword(newPassword)) errors.newPassword = PASSWORD_ERROR;
+  if (!confirmPassword) errors.confirmPassword = "Type the new password again.";
+  else if (newPassword !== confirmPassword) errors.confirmPassword = "The two passwords don't match.";
+  const live = useLiveValidation<"newPassword" | "confirmPassword">(errors);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (newPassword.length < 8) {
-      setError("Use at least 8 characters.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError("The two passwords don't match.");
-      return;
-    }
+    if (!live.validateAll()) return;
     setSubmitting(true);
     try {
       await resetPassword(token ?? "", newPassword);
@@ -113,28 +116,31 @@ export default function ResetPasswordForm() {
         <label className="field-label" htmlFor="newPassword">
           New password
         </label>
-        <input
+        <PasswordField
           id="newPassword"
-          className="field"
-          type="password"
           autoComplete="new-password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
-          placeholder="At least 8 characters"
+          onBlur={live.onBlur("newPassword")}
+          aria-invalid={!!live.error("newPassword")}
+          placeholder="Create a strong password"
           required
         />
+        <PasswordRules password={newPassword} />
         <label className="field-label" htmlFor="confirmPassword">
           Confirm new password
         </label>
-        <input
+        <PasswordField
           id="confirmPassword"
-          className="field"
-          type="password"
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
+          onBlur={live.onBlur("confirmPassword")}
+          aria-invalid={!!live.error("confirmPassword")}
+          aria-describedby={live.error("confirmPassword") ? "confirmPassword-error" : undefined}
           required
         />
+        <FieldError id="confirmPassword" message={live.error("confirmPassword")} />
         <button type="submit" disabled={submitting} className="btn btn-primary btn-block">
           {submitting ? "Saving…" : "Save New Password"}
         </button>

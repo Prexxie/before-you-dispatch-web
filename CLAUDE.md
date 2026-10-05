@@ -37,11 +37,11 @@ Main causes:
 
 ## Map implementation notes
 
-- Use a free, open map tool (e.g. Leaflet + OpenStreetMap tiles), no paid account, no credit card.
+- Map: Leaflet, with HERE tiles/satellite/place search (HERE freemium plan, card on file, stays inside the free allowance; set NEXT_PUBLIC_HERE_API_KEY). Falls back to OpenStreetMap tiles and Photon/Nominatim search when no key is set. Changed 5 Oct 2026: OpenStreetMap data was too thin in Nigeria.
 - Center the map near the customer using the phone browser's geolocation permission (built-in, no cost).
 - Let the customer search by estate/street name using a free address-search service bundled with the same map stack (e.g. Nominatim).
 - Pin should be draggable to fine-tune after auto-center or search.
-- None of this needs a paid map subscription. Don't introduce one.
+- Stay inside HERE's free allowance. Don't introduce a paid map subscription.
 
 ## Messaging notes
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { HERE_KEY, SATELLITE_TILES, STREET_TILES } from "@/lib/mapConfig";
 import L from "leaflet";
 import {
   MapContainer,
@@ -29,16 +30,19 @@ type Props = {
 // The design's crimson pin, drawn as HTML so it survives bundling (Leaflet's
 // default marker images don't). Anchored at the pin's point.
 function pinIcon(showTip: boolean) {
+  // The tip floats above the pin and ignores touches, so only the pin itself
+  // is the drag handle.
   const tip = showTip
-    ? '<span class="map-pin-tip" style="margin-bottom:6px">Drag to your exact spot</span>'
+    ? '<span class="map-pin-tip" style="position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:6px;pointer-events:none">Drag to your exact spot</span>'
     : "";
   return L.divIcon({
     className: "",
-    html: `<div style="position:absolute;left:0;bottom:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center">${tip}${MAP_PIN_SVG}</div>`,
-    // Zero-size anchor element at the location; the pin hangs above it. The
-    // pin's point is 3px above the SVG's bottom edge, hence the -3.
-    iconSize: [0, 0],
-    iconAnchor: [0, -3],
+    html: `<div style="position:relative;width:48px;height:48px;display:flex;align-items:flex-end;justify-content:center;cursor:grab;touch-action:none">${tip}${MAP_PIN_SVG}</div>`,
+    // A real 48px box (a comfortable finger-sized drag handle; a zero-size
+    // icon was too hard to grab). The pin's point is 3px above the SVG's
+    // bottom edge, so the anchor sits 3px above the box's bottom.
+    iconSize: [48, 48],
+    iconAnchor: [24, 45],
   });
 }
 
@@ -85,7 +89,9 @@ export default function PinMap({
 }: Props) {
   const editable = !readOnly && onPinChange !== undefined;
   const icon = useMemo(() => pinIcon(showTip), [showTip]);
+  const [satellite, setSatellite] = useState(false);
   return (
+    <>
     <MapContainer
       center={[pin.lat, pin.lng]}
       zoom={16}
@@ -93,7 +99,13 @@ export default function PinMap({
       zoomControl={false}
       attributionControl={false}
     >
-      <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      <TileLayer
+        key={satellite ? "sat" : "street"}
+        url={satellite && SATELLITE_TILES ? SATELLITE_TILES : STREET_TILES}
+        maxZoom={19}
+        // HERE tiles are 512px drawn at 256 (sharp on phones).
+        {...(HERE_KEY ? { tileSize: 512, zoomOffset: -1 } : {})}
+      />
       <Marker
         position={[pin.lat, pin.lng]}
         icon={icon}
@@ -111,5 +123,31 @@ export default function PinMap({
       <InvalidateOnResize />
       {editable && <TapToMove onPinChange={onPinChange} />}
     </MapContainer>
+    {SATELLITE_TILES && (
+      <button
+        type="button"
+        onClick={() => setSatellite((s) => !s)}
+        aria-pressed={satellite}
+        style={{
+          position: "absolute",
+          right: 12,
+          bottom: 66,
+          zIndex: 1000,
+          height: 32,
+          padding: "0 12px",
+          borderRadius: 999,
+          border: "none",
+          background: "#ffffff",
+          color: "var(--brand-dark)",
+          fontSize: 12,
+          fontWeight: 700,
+          boxShadow: "0 4px 12px -4px rgba(28, 25, 23, 0.3)",
+          cursor: "pointer",
+        }}
+      >
+        {satellite ? "Map" : "Satellite"}
+      </button>
+    )}
+    </>
   );
 }

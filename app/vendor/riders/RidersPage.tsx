@@ -3,16 +3,20 @@
 import LogoLoader from "@/components/LogoLoader";
 import { FormEvent, useState } from "react";
 import {
-  CreateRiderInput,
   Rider,
-  VENDOR_CATEGORY_LABELS,
   ValidationError,
   Vehicle,
+  categoryLabel,
   createRider,
   getMe,
   getRiders,
   setRiderActive,
+  updateRider,
 } from "@/lib/api";
+import FieldError from "@/components/FieldError";
+import { useLiveValidation } from "@/lib/useLiveValidation";
+import LogoPicker from "@/components/LogoPicker";
+import { PHONE_ERROR, isValidPhone } from "@/lib/validate";
 import { useLiveData } from "@/lib/useLiveData";
 import { initials } from "@/lib/format";
 import AppShell from "@/components/AppShell";
@@ -23,9 +27,11 @@ const VEHICLE_LABELS: Record<Vehicle, string> = {
   van: "Van",
 };
 
-type Field = keyof CreateRiderInput;
+type Field = keyof RiderForm;
 
-const EMPTY_FORM: CreateRiderInput = { name: "", phone: "", vehicle: "bike" };
+type RiderForm = { name: string; phone: string; vehicle: Vehicle };
+
+const EMPTY_FORM: RiderForm = { name: "", phone: "", vehicle: "bike" };
 
 // Design: "Vendor: Manage Riders". The table + form split, riders sorted by
 // name, both active and deactivated ones shown (a deactivated rider stays
@@ -33,12 +39,17 @@ const EMPTY_FORM: CreateRiderInput = { name: "", phone: "", vehicle: "bike" };
 // past orders still reference them).
 export default function RidersPage() {
   const [refreshKey, setRefreshKey] = useState(0);
+  // The rider being edited in the form on the right; null means "add a rider".
+  const [editing, setEditing] = useState<Rider | null>(null);
+  // Bumped after each save so the form starts fresh (no leftover "touched"
+  // errors on the emptied fields).
+  const [formVersion, setFormVersion] = useState(0);
   const [state] = useLiveData(() => getRiders(), `riders-${refreshKey}`);
   const [meState] = useLiveData(() => getMe(), "riders-me");
   const riders = state.kind === "ready" ? state.data : null;
   const businessName =
     meState.kind === "ready" ? (meState.data?.businessName ?? null) : null;
-  const category = meState.kind === "ready" ? meState.data?.category : null;
+  const vendor = meState.kind === "ready" ? meState.data : null;
   const themeColor =
     meState.kind === "ready" ? meState.data?.themeColor : undefined;
 
@@ -51,7 +62,7 @@ export default function RidersPage() {
       active="riders"
       title="Riders"
       businessName={businessName}
-      businessCategory={category ? VENDOR_CATEGORY_LABELS[category] : null}
+      businessCategory={vendor ? categoryLabel(vendor) : null}
       themeColor={themeColor}
     >
       {state.kind === "loading" ? (
@@ -94,7 +105,7 @@ export default function RidersPage() {
                     </thead>
                     <tbody>
                       {riders.map((r) => (
-                        <RiderRow key={r.id} rider={r} onChanged={reload} />
+                        <RiderRow key={r.id} rider={r} onChanged={reload} onEdit={() => setEditing(r)} />
                       ))}
                     </tbody>
                   </table>
@@ -102,7 +113,17 @@ export default function RidersPage() {
               )}
             </div>
 
-            <AddRiderCard onAdded={reload} />
+            <RiderFormCard
+              // A fresh form for each rider picked (or for "add").
+              key={`${editing?.id ?? "new"}-${formVersion}`}
+              rider={editing}
+              onDone={() => {
+                setEditing(null);
+                setFormVersion((v) => v + 1);
+                reload();
+              }}
+              onCancel={() => setEditing(null)}
+            />
           </div>
         </>
       )}
@@ -113,9 +134,11 @@ export default function RidersPage() {
 function RiderRow({
   rider,
   onChanged,
+  onEdit,
 }: {
   rider: Rider;
   onChanged: () => void;
+  onEdit: () => void;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -132,7 +155,15 @@ function RiderRow({
   return (
     <tr>
       <td>
-        <span className="avatar">{initials(rider.name)}</span>
+        <span className="avatar">
+          {rider.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- a saved
+            // data URL, not a served asset.
+            <img src={rider.photoUrl} alt="" />
+          ) : (
+            initials(rider.name)
+          )}
+        </span>
         {rider.name}
       </td>
       <td>{rider.phone}</td>
@@ -144,7 +175,10 @@ function RiderRow({
           {rider.active ? "Active" : "Inactive"}
         </span>
       </td>
-      <td>
+      <td style={{ whiteSpace: "nowrap" }}>
+        <button type="button" onClick={onEdit} className="underline text-[13px] mr-4">
+          Edit
+        </button>
         <button
           type="button"
           onClick={toggle}
@@ -158,48 +192,68 @@ function RiderRow({
   );
 }
 
-function AddRiderCard({ onAdded }: { onAdded: () => void }) {
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [fieldErrors, setFieldErrors] = useState<Field[]>([]);
+// "Add a rider" when `rider` is null, otherwise "Edit rider" for that one.
+function RiderFormCard({
+  rider,
+  onDone,
+  onCancel,
+}: {
+  rider: Rider | null;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState<RiderForm>(
+    rider
+      ? { name: rider.name, phone: rider.phone, vehicle: rider.vehicle ?? "bike" }
+      : EMPTY_FORM,
+  );
+  const [photo, setPhoto] = useState<string | null>(rider?.photoUrl ?? null);
+  // Fields the API rejected that the form's own checks passed.
+  const [serverFields, setServerFields] = useState<(Field | "photoDataUrl")[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function update(field: Field, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
-    setFieldErrors((errs) => errs.filter((e) => e !== field));
+    setServerFields((errs) => errs.filter((e) => e !== field));
   }
 
-  function checkForm(): Field[] {
-    const bad: Field[] = [];
-    if (!form.name.trim()) bad.push("name");
-    const digits = form.phone.replace(/\D/g, "").length;
-    if (digits < 10 || digits > 15) bad.push("phone");
-    return bad;
-  }
+  // Errors show as each field is left, then update as the person types.
+  const errors: Partial<Record<Field, string>> = {};
+  if (!form.name.trim()) errors.name = "Enter the rider's name.";
+  if (!form.phone.trim()) errors.phone = "Enter the rider's phone number.";
+  else if (!isValidPhone(form.phone)) errors.phone = PHONE_ERROR;
+  const live = useLiveValidation<Field>(errors);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const bad = checkForm();
-    setFieldErrors(bad);
-    if (bad.length > 0) return;
+    if (!live.validateAll()) return;
 
     setSubmitting(true);
     try {
-      await createRider({
-        ...form,
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-      });
-      onAdded();
-      setForm(EMPTY_FORM);
+      const details = { ...form, name: form.name.trim(), phone: form.phone.trim() };
+      if (rider) {
+        // The photo is only sent when it changed ("" removes it).
+        await updateRider(rider.id, {
+          ...details,
+          ...(photo !== (rider.photoUrl ?? null) ? { photoDataUrl: photo ?? "" } : {}),
+        });
+      } else {
+        await createRider({ ...details, photoDataUrl: photo ?? undefined });
+        setForm(EMPTY_FORM);
+        setPhoto(null);
+      }
+      onDone();
     } catch (err) {
       if (err instanceof ValidationError) {
-        setFieldErrors(err.fields as Field[]);
+        setServerFields(err.fields as (Field | "photoDataUrl")[]);
         setError(err.message);
       } else {
         setError(
-          "Couldn't add that rider. Check your connection and try again.",
+          rider
+            ? "Couldn't save that rider. Check your connection and try again."
+            : "Couldn't add that rider. Check your connection and try again.",
         );
       }
     } finally {
@@ -207,17 +261,25 @@ function AddRiderCard({ onAdded }: { onAdded: () => void }) {
     }
   }
 
-  const invalid = (field: Field) => fieldErrors.includes(field);
+  const invalid = (field: Field) => !!live.error(field) || serverFields.includes(field);
 
   return (
     <form onSubmit={submit} noValidate className="card">
       <p className="h2" style={{ fontSize: 16 }}>
-        Add a rider
+        {rider ? "Edit rider" : "Add a rider"}
       </p>
       <p className="sub" style={{ marginBottom: 18 }}>
-        You can add your own staff riders, or third-party dispatch riders you
-        use often.
+        {rider
+          ? "Changes show on this rider's future links and the Assign a rider list."
+          : "You can add your own staff riders, or third-party dispatch riders you use often."}
       </p>
+
+      <LogoPicker
+        value={photo}
+        onChange={setPhoto}
+        label="Add the rider's photo"
+        changeLabel="Change the rider's photo"
+      />
 
       <label className="field-label" htmlFor="riderName">
         Rider name
@@ -227,10 +289,13 @@ function AddRiderCard({ onAdded }: { onAdded: () => void }) {
         className="field"
         value={form.name}
         onChange={(e) => update("name", e.target.value)}
+        onBlur={live.onBlur("name")}
         placeholder="e.g. Lawan"
         aria-invalid={invalid("name")}
+        aria-describedby={live.error("name") ? "riderName-error" : undefined}
         required
       />
+      <FieldError id="riderName" message={live.error("name")} />
 
       <label className="field-label" htmlFor="riderPhone">
         Phone number
@@ -241,9 +306,15 @@ function AddRiderCard({ onAdded }: { onAdded: () => void }) {
         type="tel"
         value={form.phone}
         onChange={(e) => update("phone", e.target.value)}
+        onBlur={live.onBlur("phone")}
         placeholder="e.g. 0803 555 1234"
         aria-invalid={invalid("phone")}
+        aria-describedby={invalid("phone") ? "riderPhone-error" : undefined}
         required
+      />
+      <FieldError
+        id="riderPhone"
+        message={live.error("phone") ?? (serverFields.includes("phone") ? PHONE_ERROR : undefined)}
       />
 
       <label className="field-label" htmlFor="riderVehicle">
@@ -262,13 +333,26 @@ function AddRiderCard({ onAdded }: { onAdded: () => void }) {
         ))}
       </select>
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="btn btn-primary btn-block"
-      >
-        {submitting ? "Adding…" : "+ Add Rider"}
-      </button>
+      <div className="row-flex">
+        {rider && (
+          <button type="button" onClick={onCancel} disabled={submitting} className="btn btn-secondary">
+            Cancel
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={submitting}
+          className={`btn btn-primary ${rider ? "" : "btn-block"}`}
+        >
+          {submitting
+            ? rider
+              ? "Saving…"
+              : "Adding…"
+            : rider
+              ? "Save Changes"
+              : "+ Add Rider"}
+        </button>
+      </div>
       {error && (
         <p className="mt-3 text-sm font-semibold text-danger" role="alert">
           {error}

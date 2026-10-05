@@ -6,9 +6,9 @@ import { ThemeColor } from "./api";
 // family (secondary buttons, the sidebar tint, borders, links) and --accent
 // (primary buttons, the sidebar's active indicator, highlighted stats and
 // badges), so the whole workspace reads as one color rather than two.
-// "green" is special-cased to mean *no* override: it's today's actual
-// shipped look (brand green + accent crimson, unchanged), so a vendor who
-// never opens this picker sees no difference — see themeStyle() below.
+// "green" is the default (brand green + accent crimson, unchanged), so a
+// vendor who never opens this picker sees no difference — see themeStyle()
+// below.
 // Either way, the "WakaRoute" brand mark (the logo pin) and the
 // customer/rider pages never change, matching the design's own copy: "the
 // WakaRoute brand stays the same everywhere else."
@@ -75,11 +75,22 @@ export const THEME_COLOR_ORDER: ThemeColor[] = [
 ];
 
 // CSS custom-property overrides for the given theme, to spread onto the
-// vendor shell's root style — see AppShell.tsx. "green" returns {}: it's
-// today's real default (brand green + accent crimson), not a re-tint.
+// vendor shell's root style — see AppShell.tsx. "green" is the app's default
+// look (brand green + accent crimson), but it's spelled out too rather than
+// left empty: the page may already be wearing another colour from the saved
+// cookie (app/vendor/layout.tsx), and green has to be able to put it back.
 export function themeStyle(color: ThemeColor): CSSProperties {
-  if (color === "green") return {};
   const t = THEME_PRESETS[color];
+  if (color === "green") {
+    return {
+      "--brand": t.brand,
+      "--brand-dark": t.brandDark,
+      "--brand-tint": t.brandTint,
+      "--brand-line": t.brandLine,
+      "--accent": "#9f1239",
+      "--accent-dark": "#7a0f2e",
+    } as CSSProperties;
+  }
   return {
     "--brand": t.brand,
     "--brand-dark": t.brandDark,

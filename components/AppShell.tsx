@@ -29,14 +29,15 @@ export default function AppShell({
   // Design: the sidebar shows the vendor's category under their name
   // ("Food & restaurant"), not anything about today.
   businessCategory: string | null;
-  // Design: "Vendor: Settings", Workspace theme. Defaults to the app's own
-  // green while the vendor hasn't loaded yet, so nothing flashes untinted.
+  // Design: "Vendor: Settings", Workspace theme. Undefined while the vendor
+  // hasn't loaded yet: the shell then keeps the colour app/vendor/layout.tsx
+  // already painted from the saved cookie, instead of flashing the default.
   themeColor?: ThemeColor;
   children: ReactNode;
 }) {
   return (
     <div className="page">
-      <div className="app-shell" style={themeStyle(themeColor ?? "green")}>
+      <div className="app-shell" style={themeColor ? themeStyle(themeColor) : undefined}>
         <nav className="sidebar" aria-label="Main">
           <div className="sidebar-brand">
             <LogoMark size={18} />

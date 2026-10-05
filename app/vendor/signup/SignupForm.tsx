@@ -5,28 +5,37 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { FormEvent, useMemo, useState, useSyncExternalStore } from "react";
 import {
   SignUpInput,
-  VENDOR_CATEGORY_LABELS,
   ValidationError,
   VendorCategory,
+  categoryLabel,
   googleSignIn,
   googleSignUp,
   signUp,
 } from "@/lib/api";
 import GoogleButton, { GoogleProgress } from "@/components/GoogleButton";
 import LogoPicker from "@/components/LogoPicker";
+import CategoryField from "@/components/CategoryField";
+import { EMAIL_ERROR, PASSWORD_ERROR, isStrongPassword, isValidEmail } from "@/lib/validate";
+import FieldError from "@/components/FieldError";
+import { useLiveValidation } from "@/lib/useLiveValidation";
+import PasswordField from "@/components/PasswordField";
+import PasswordRules from "@/components/PasswordRules";
 import LogoLoader from "@/components/LogoLoader";
 
 // A Google user who has no account yet: what the API verified about them,
 // carried to the business-details step.
 type GoogleSetup = { ticket: string; email: string; name: string };
 
-type AccountFields = Omit<SignUpInput, "businessAddress" | "businessPhone" | "logoDataUrl">;
+type AccountFields = Omit<SignUpInput, "businessAddress" | "businessPhone" | "logoDataUrl"> & {
+  categoryOther: string;
+};
 type Field = keyof AccountFields;
 
 const EMPTY_ACCOUNT: AccountFields = {
   businessName: "",
   ownerName: "",
   category: "",
+  categoryOther: "",
   email: "",
   password: "",
 };
@@ -134,41 +143,35 @@ function AccountStep({
   onNext: (account: AccountFields) => void;
 }) {
   const [form, setForm] = useState(initial);
-  const [fieldErrors, setFieldErrors] = useState<Field[]>([]);
   const [error, setError] = useState<string | null>(initialError);
   const [googleBusy, setGoogleBusy] = useState(false);
 
   function update(field: Field, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
-    setFieldErrors((errs) => errs.filter((e) => e !== field));
   }
 
   // Client-side only — the same checks the API makes, so a typo doesn't
   // cost a trip to the second step and back. The API still validates for
-  // real when the account is actually created.
-  function checkForm(): Field[] {
-    const bad: Field[] = [];
-    if (!form.businessName.trim()) bad.push("businessName");
-    if (!form.ownerName.trim()) bad.push("ownerName");
-    if (!form.category) bad.push("category");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) bad.push("email");
-    if (form.password.length < 8) bad.push("password");
-    return bad;
+  // real when the account is actually created. Errors show as the person
+  // leaves each field and then update as they type (useLiveValidation).
+  const errors: Partial<Record<Field, string>> = {};
+  if (!form.businessName.trim()) errors.businessName = "Enter your business name.";
+  if (!form.ownerName.trim()) errors.ownerName = "Enter your full name.";
+  if (!form.category) errors.category = "Choose what kind of business you run.";
+  if (form.category === "other" && !form.categoryOther.trim()) {
+    errors.categoryOther = "Tell us your business type.";
   }
+  if (!form.email.trim()) errors.email = "Enter your email address.";
+  else if (!isValidEmail(form.email)) errors.email = EMAIL_ERROR;
+  if (!isStrongPassword(form.password)) errors.password = PASSWORD_ERROR;
+  const live = useLiveValidation<Field>(errors);
 
   function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const bad = checkForm();
-    setFieldErrors(bad);
-    if (bad.length > 0) {
-      setError("Check the fields marked below.");
-      return;
-    }
+    if (!live.validateAll()) return;
     onNext(form);
   }
-
-  const invalid = (field: Field) => fieldErrors.includes(field);
 
   async function handleGoogle(credential: string) {
     setError(null);
@@ -217,10 +220,13 @@ function AccountStep({
           className="field"
           value={form.businessName}
           onChange={(e) => update("businessName", e.target.value)}
+          onBlur={live.onBlur("businessName")}
           placeholder="e.g. Precious Food Business"
-          aria-invalid={invalid("businessName")}
+          aria-invalid={!!live.error("businessName")}
+          aria-describedby={live.error("businessName") ? "businessName-error" : undefined}
           required
         />
+        <FieldError id="businessName" message={live.error("businessName")} />
 
         <label className="field-label" htmlFor="ownerName">
           Your full name
@@ -230,10 +236,13 @@ function AccountStep({
           className="field"
           value={form.ownerName}
           onChange={(e) => update("ownerName", e.target.value)}
+          onBlur={live.onBlur("ownerName")}
           placeholder="e.g. Chuka Eze"
-          aria-invalid={invalid("ownerName")}
+          aria-invalid={!!live.error("ownerName")}
+          aria-describedby={live.error("ownerName") ? "ownerName-error" : undefined}
           required
         />
+        <FieldError id="ownerName" message={live.error("ownerName")} />
 
         <label className="field-label" htmlFor="email">
           Email address
@@ -245,46 +254,42 @@ function AccountStep({
           autoComplete="email"
           value={form.email}
           onChange={(e) => update("email", e.target.value)}
+          onBlur={live.onBlur("email")}
           placeholder="you@business.com"
-          aria-invalid={invalid("email")}
+          aria-invalid={!!live.error("email")}
+          aria-describedby={live.error("email") ? "email-error" : undefined}
           required
         />
+        <FieldError id="email" message={live.error("email")} />
 
         <label className="field-label" htmlFor="password">
           Password
         </label>
-        <input
+        <PasswordField
           id="password"
-          className="field"
-          type="password"
           autoComplete="new-password"
           value={form.password}
           onChange={(e) => update("password", e.target.value)}
-          placeholder="At least 8 characters"
-          aria-invalid={invalid("password")}
+          onBlur={live.onBlur("password")}
+          placeholder="Create a strong password"
+          aria-invalid={!!live.error("password")}
           required
         />
+        <PasswordRules password={form.password} />
 
-        <label className="field-label" htmlFor="category">
-          What do you sell?
-        </label>
-        <select
-          id="category"
-          className="field"
-          value={form.category}
-          onChange={(e) => update("category", e.target.value)}
-          aria-invalid={invalid("category")}
-          required
-        >
-          <option value="" disabled>
-            Choose a category
-          </option>
-          {Object.entries(VENDOR_CATEGORY_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <CategoryField
+          category={form.category}
+          categoryOther={form.categoryOther}
+          onCategory={(c) => {
+            update("category", c);
+            update("categoryOther", "");
+          }}
+          onCategoryOther={(t) => update("categoryOther", t)}
+          categoryError={live.error("category")}
+          otherError={live.error("categoryOther")}
+          onBlurCategory={live.onBlur("category")}
+          onBlurOther={live.onBlur("categoryOther")}
+        />
 
         <button type="submit" className="btn btn-primary btn-block">
           Create Account
@@ -311,20 +316,18 @@ function WorkspaceStep({
   onBack: (error?: string) => void;
 }) {
   const [businessAddress, setBusinessAddress] = useState("");
-  const [addressError, setAddressError] = useState(false);
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const live = useLiveValidation<"businessAddress">({
+    businessAddress: businessAddress.trim() ? undefined : "Enter your business address.",
+  });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!live.validateAll()) return;
     const address = businessAddress.trim();
-    setAddressError(!address);
-    if (!address) {
-      setError("Enter your business address.");
-      return;
-    }
     setSubmitting(true);
     try {
       await signUp({
@@ -367,9 +370,12 @@ function WorkspaceStep({
           <span className="readonly-val">{account.businessName}</span>
         </div>
         <div className="readonly-row">
-          <span className="readonly-label">WHAT YOU SELL</span>
+          <span className="readonly-label">BUSINESS TYPE</span>
           <span className="readonly-val">
-            {VENDOR_CATEGORY_LABELS[account.category as VendorCategory]}
+            {categoryLabel({
+              category: account.category as VendorCategory,
+              categoryOther: account.categoryOther,
+            })}
           </span>
         </div>
         <div className="readonly-row">
@@ -384,14 +390,14 @@ function WorkspaceStep({
           id="businessAddress"
           className="field"
           value={businessAddress}
-          onChange={(e) => {
-            setBusinessAddress(e.target.value);
-            setAddressError(false);
-          }}
+          onChange={(e) => setBusinessAddress(e.target.value)}
+          onBlur={live.onBlur("businessAddress")}
           placeholder="e.g. 12 Allen Avenue, Ikeja"
-          aria-invalid={addressError}
+          aria-invalid={!!live.error("businessAddress")}
+          aria-describedby={live.error("businessAddress") ? "businessAddress-error" : undefined}
           required
         />
+        <FieldError id="businessAddress" message={live.error("businessAddress")} />
 
         {submitting && <LogoLoader page cover label="Creating your account…" />}
         <button type="submit" disabled={submitting} className="btn btn-primary btn-block">
@@ -420,26 +426,25 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
   const [businessName, setBusinessName] = useState("");
   const [ownerName, setOwnerName] = useState(setup.name);
   const [category, setCategory] = useState<VendorCategory | "">("");
+  const [categoryOther, setCategoryOther] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
+  type GField = "businessName" | "ownerName" | "category" | "categoryOther" | "businessAddress";
+  const errors: Partial<Record<GField, string>> = {};
+  if (!businessName.trim()) errors.businessName = "Enter your business name.";
+  if (!ownerName.trim()) errors.ownerName = "Enter your full name.";
+  if (!category) errors.category = "Choose what kind of business you run.";
+  if (category === "other" && !categoryOther.trim()) errors.categoryOther = "Tell us your business type.";
+  if (!businessAddress.trim()) errors.businessAddress = "Enter your business address.";
+  const live = useLiveValidation<GField>(errors);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const bad: string[] = [];
-    if (!businessName.trim()) bad.push("businessName");
-    if (!ownerName.trim()) bad.push("ownerName");
-    if (!category) bad.push("category");
-    if (!businessAddress.trim()) bad.push("businessAddress");
-    setFieldErrors(bad);
-    if (bad.length > 0) {
-      setError("Check the fields marked below.");
-      return;
-    }
+    if (!live.validateAll()) return;
     setSubmitting(true);
     try {
       await googleSignUp({
@@ -447,6 +452,7 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
         businessName: businessName.trim(),
         ownerName: ownerName.trim(),
         category,
+        categoryOther: category === "other" ? categoryOther.trim() : undefined,
         businessAddress: businessAddress.trim(),
         logoDataUrl: logoDataUrl ?? undefined,
       });
@@ -464,8 +470,6 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
       setSubmitting(false);
     }
   }
-
-  const invalid = (f: string) => fieldErrors.includes(f);
 
   if (expired) {
     return (
@@ -515,10 +519,13 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
           className="field"
           value={businessName}
           onChange={(e) => setBusinessName(e.target.value)}
+          onBlur={live.onBlur("businessName")}
           placeholder="e.g. Precious Food Business"
-          aria-invalid={invalid("businessName")}
+          aria-invalid={!!live.error("businessName")}
+          aria-describedby={live.error("businessName") ? "gBusinessName-error" : undefined}
           required
         />
+        <FieldError id="gBusinessName" message={live.error("businessName")} />
 
         <label className="field-label" htmlFor="gOwnerName">
           Your full name
@@ -528,30 +535,27 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
           className="field"
           value={ownerName}
           onChange={(e) => setOwnerName(e.target.value)}
-          aria-invalid={invalid("ownerName")}
+          onBlur={live.onBlur("ownerName")}
+          aria-invalid={!!live.error("ownerName")}
+          aria-describedby={live.error("ownerName") ? "gOwnerName-error" : undefined}
           required
         />
+        <FieldError id="gOwnerName" message={live.error("ownerName")} />
 
-        <label className="field-label" htmlFor="gCategory">
-          What do you sell?
-        </label>
-        <select
-          id="gCategory"
-          className="field"
-          value={category}
-          onChange={(e) => setCategory(e.target.value as VendorCategory)}
-          aria-invalid={invalid("category")}
-          required
-        >
-          <option value="" disabled>
-            Choose a category
-          </option>
-          {Object.entries(VENDOR_CATEGORY_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <CategoryField
+          idPrefix="g"
+          category={category}
+          categoryOther={categoryOther}
+          onCategory={(c) => {
+            setCategory(c);
+            setCategoryOther("");
+          }}
+          onCategoryOther={setCategoryOther}
+          categoryError={live.error("category")}
+          otherError={live.error("categoryOther")}
+          onBlurCategory={live.onBlur("category")}
+          onBlurOther={live.onBlur("categoryOther")}
+        />
 
         <label className="field-label" htmlFor="gBusinessAddress">
           Business address
@@ -561,10 +565,13 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
           className="field"
           value={businessAddress}
           onChange={(e) => setBusinessAddress(e.target.value)}
+          onBlur={live.onBlur("businessAddress")}
           placeholder="e.g. 12 Allen Avenue, Ikeja"
-          aria-invalid={invalid("businessAddress")}
+          aria-invalid={!!live.error("businessAddress")}
+          aria-describedby={live.error("businessAddress") ? "gBusinessAddress-error" : undefined}
           required
         />
+        <FieldError id="gBusinessAddress" message={live.error("businessAddress")} />
 
         {submitting && <LogoLoader page cover label="Creating your account…" />}
         <button type="submit" disabled={submitting} className="btn btn-primary btn-block">
