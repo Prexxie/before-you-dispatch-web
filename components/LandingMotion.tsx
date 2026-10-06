@@ -6,43 +6,32 @@ import { useEffect, useRef } from "react";
 // or with reduced motion, the page is fully visible and still.
 
 // Scroll reveal for the landing page, driven entirely by class names so the
-// markup stays plain. `.lp-reveal` elements below the fold start hidden
-// (`pre`) and fade up when they scroll into view; `.lp-draw` elements just get
-// "in" so their own animation can start.
+// markup stays plain. `.lp-reveal` elements start hidden (`pre`) and fade up
+// ("in") whenever they scroll into view, and reset when they leave, so the
+// motion plays every time, not just the first. `.lp-draw` elements get the
+// same classes so their own step-by-step animation can (re)start. Without
+// JavaScript, or with reduced motion, nothing is ever hidden.
 export function ScrollReveal() {
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const timers: ReturnType<typeof setTimeout>[] = [];
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const els = document.querySelectorAll<HTMLElement>(".lp-reveal, .lp-draw");
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          const el = e.target as HTMLElement;
-          io.unobserve(el);
-          el.classList.add("in");
-          // Once it has faded in, drop the helper classes so the element's
-          // own hover transitions take over again.
-          if (el.classList.contains("pre")) {
-            timers.push(
-              setTimeout(() => el.classList.remove("pre", "in"), 1000),
-            );
-          }
+          e.target.classList.toggle("in", e.isIntersecting);
         }
       },
-      { threshold: 0.15 },
+      // A bit of margin so things reset once well out of sight, not at the edge.
+      { threshold: 0.15, rootMargin: "0px 0px -4% 0px" },
     );
-    document.querySelectorAll<HTMLElement>(".lp-reveal, .lp-draw").forEach((el) => {
-      const below = el.getBoundingClientRect().top > window.innerHeight * 0.92;
-      if (el.classList.contains("lp-reveal")) {
-        if (reduce || !below) return;
-        el.classList.add("pre");
-      }
+    els.forEach((el) => {
+      el.classList.add("pre");
       io.observe(el);
     });
     return () => {
       io.disconnect();
-      timers.forEach(clearTimeout);
+      els.forEach((el) => el.classList.remove("pre", "in"));
     };
   }, []);
   return null;
@@ -74,11 +63,14 @@ export function CountUp({
     const show = (n: number) => {
       el.textContent = `${prefix}${Math.round(n)}${suffix}`;
     };
-    show(0);
     let raf = 0;
     const io = new IntersectionObserver((entries) => {
-      if (!entries.some((e) => e.isIntersecting)) return;
-      io.disconnect();
+      cancelAnimationFrame(raf);
+      if (!entries.some((e) => e.isIntersecting)) {
+        // Out of sight: get ready to count again next time.
+        show(0);
+        return;
+      }
       const start = performance.now();
       const tick = (now: number) => {
         const t = Math.min(1, (now - start) / duration);
@@ -91,6 +83,7 @@ export function CountUp({
     return () => {
       io.disconnect();
       cancelAnimationFrame(raf);
+      show(to);
     };
   }, [to, prefix, suffix, duration]);
   return (
