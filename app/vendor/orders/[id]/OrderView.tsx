@@ -280,6 +280,7 @@ function OrderScreen({
               : "Delivered"
             : "Failed"}
         </span>
+        <AttemptHistory order={order} />
         <BackToDashboard />
       </div>
     </>
@@ -878,12 +879,31 @@ function OnItsWayCard({
 }
 
 // Earlier failed attempts of this order (kept when it was redelivered).
+// Failed attempts of this order, oldest first. Earlier ones are saved when the
+// vendor redelivers; the attempt that just failed is still on the order
+// itself, so it's added at the end while the order is in the failed state.
 function AttemptHistory({ order }: { order: VendorOrder }) {
-  if (order.attempts.length === 0) return null;
+  const rows = order.attempts.map((a) => ({
+    attemptNumber: a.attemptNumber,
+    riderName: a.riderName,
+    failureReason: a.failureReason,
+    failureNote: a.failureNote,
+    failedAt: a.failedAt,
+  }));
+  if (order.status === "failed") {
+    rows.push({
+      attemptNumber: order.attempt,
+      riderName: order.rider.name,
+      failureReason: order.failureReason,
+      failureNote: order.failureNote,
+      failedAt: order.completedAt,
+    });
+  }
+  if (rows.length === 0) return null;
   return (
     <div className="mt-6">
       <p className="field-label">Attempt history</p>
-      {order.attempts.map((a) => (
+      {rows.map((a) => (
         <div key={a.attemptNumber} className="attempt">
           <span className="badge badge-danger">Failed</span>
           <span>
