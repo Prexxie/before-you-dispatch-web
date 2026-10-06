@@ -86,6 +86,7 @@ export default function CreateOrderFlow() {
   // Errors show as each field is left, then update as the person types.
   const live = useLiveValidation<Field>(
     Object.fromEntries(checkForm(form).map((f) => [f, FIELD_MESSAGES[f]])),
+    form,
   );
 
   async function submit(e: FormEvent) {

@@ -29,6 +29,12 @@ export function whatsappLink(phone: string, message: string): string {
   return `https://wa.me/${toWhatsAppNumber(phone)}?text=${encodeURIComponent(message)}`;
 }
 
+// Opens the phone's SMS app with the message ready, for people who aren't on
+// WhatsApp. "?&body=" is the form both iOS and Android accept.
+export function smsLink(phone: string, message: string): string {
+  return `sms:${phone.replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(message)}`;
+}
+
 // Opens Google Maps (app or web) with directions to the customer's pin.
 export function directionsLink(lat: number, lng: number): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;

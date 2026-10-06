@@ -30,7 +30,10 @@ export default function ResetPasswordForm() {
   if (!isStrongPassword(newPassword)) errors.newPassword = PASSWORD_ERROR;
   if (!confirmPassword) errors.confirmPassword = "Type the new password again.";
   else if (newPassword !== confirmPassword) errors.confirmPassword = "The two passwords don't match.";
-  const live = useLiveValidation<"newPassword" | "confirmPassword">(errors);
+  const live = useLiveValidation<"newPassword" | "confirmPassword">(errors, {
+    newPassword,
+    confirmPassword,
+  });
 
   async function submit(e: FormEvent) {
     e.preventDefault();

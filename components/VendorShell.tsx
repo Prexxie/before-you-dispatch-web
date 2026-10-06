@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ReactNode } from "react";
 import Breadcrumbs, { Crumb } from "./Breadcrumbs";
 import { LogoMark } from "./icons";
-import LogoutButton from "./LogoutButton";
+import { ProfileMenu } from "./Profile";
 
 // Dark green top bar + narrow content column, as in the "Vendor: Create
 // Order" and "Vendor: Link Generated" designs.
@@ -26,7 +26,7 @@ export default function VendorShell({
           <Link href="/vendor" className="navlink">
             Dashboard
           </Link>
-          <LogoutButton className="navlink" />
+          <ProfileMenu />
         </div>
       </header>
       <main className="content vendor">

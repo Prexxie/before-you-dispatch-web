@@ -1,6 +1,6 @@
 import type { VendorInfo } from "@/lib/api";
 import { displayPhone, telLink } from "@/lib/links";
-import { StoreIcon } from "./icons";
+import { AddressPinIcon, StoreIcon } from "./icons";
 
 // "Which business is this from" strip (design: "Customer: Confirm Ready").
 export default function VendorStrip({ vendor }: { vendor: VendorInfo | null }) {
@@ -29,6 +29,7 @@ export function VendorContact({ vendor }: { vendor: VendorInfo }) {
   if (!vendor.address && !vendor.phone) return null;
   return (
     <span>
+      {vendor.address && <AddressPinIcon size={16} className="addr-pin" />}
       {vendor.address}
       {vendor.address && vendor.phone && " · "}
       {vendor.phone && <a href={telLink(vendor.phone)}>{displayPhone(vendor.phone)}</a>}
