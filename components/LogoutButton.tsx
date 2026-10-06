@@ -2,6 +2,8 @@
 
 import { CSSProperties, useState } from "react";
 import { logOut } from "@/lib/api";
+import { LOGOUT_LOADING, LOGOUT_TITLE } from "@/lib/brand";
+import LogoLoader from "./LogoLoader";
 
 export default function LogoutButton({
   className,
@@ -23,6 +25,10 @@ export default function LogoutButton({
   }
 
   return (
+    <>
+    {loggingOut && (
+      <LogoLoader page cover title={LOGOUT_TITLE} label={LOGOUT_LOADING} />
+    )}
     <button
       type="button"
       onClick={handleClick}
@@ -45,6 +51,7 @@ export default function LogoutButton({
       {showIcon && <LogoutIcon />}
       {loggingOut ? "Logging out…" : "Log out"}
     </button>
+    </>
   );
 }
 

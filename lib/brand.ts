@@ -5,4 +5,8 @@ export const BRAND_NAME = "WakaRoute";
 export const WELCOME_TITLE = "Welcome!";
 export const WELCOME_LOADING = "Opening your workspace…";
 
+// Shown over the whole page while signing out.
+export const LOGOUT_TITLE = "See you soon!";
+export const LOGOUT_LOADING = "Logging you out…";
+
 export const TAGLINE = "Confirm first. Dispatch smart.";

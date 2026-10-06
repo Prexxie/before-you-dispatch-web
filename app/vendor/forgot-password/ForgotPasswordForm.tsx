@@ -20,7 +20,7 @@ export default function ForgotPasswordForm() {
       : isValidEmail(email)
         ? undefined
         : EMAIL_ERROR,
-  });
+  }, { email });
 
   async function submit(e: FormEvent) {
     e.preventDefault();

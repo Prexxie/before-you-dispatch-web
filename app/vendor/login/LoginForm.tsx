@@ -33,7 +33,10 @@ export default function LoginForm() {
   if (!email.trim()) errors.email = "Enter your email address.";
   else if (!isValidEmail(email)) errors.email = EMAIL_ERROR;
   if (!password) errors.password = "Enter your password.";
-  const live = useLiveValidation<"email" | "password">(errors);
+  const live = useLiveValidation<"email" | "password">(errors, {
+    email,
+    password,
+  });
   // The email belongs to an account made with Google, which has no password
   // yet: shown with the two ways forward (Google, or set a password).
   const [googleAccount, setGoogleAccount] = useState(false);

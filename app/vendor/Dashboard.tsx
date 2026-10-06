@@ -18,7 +18,7 @@ import { formatDayTime } from "@/lib/time";
 import { WELCOME_LOADING, WELCOME_TITLE } from "@/lib/brand";
 import { initials } from "@/lib/format";
 import AppShell from "@/components/AppShell";
-import { LogoMark } from "@/components/icons";
+import { AddressPinIcon, LogoMark } from "@/components/icons";
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0];
 
@@ -114,7 +114,14 @@ function BusinessHeader({ vendor }: { vendor: VendorInfo | null }) {
           {vendor?.name ?? "Your deliveries"}
         </h1>
         <p className="sub" style={{ margin: 0 }}>
-          {contact || <>Today &middot; {date}</>}
+          {contact ? (
+            <>
+              <AddressPinIcon size={20} className="addr-pin" />
+              {contact}
+            </>
+          ) : (
+            <>Today &middot; {date}</>
+          )}
         </p>
       </div>
     </div>

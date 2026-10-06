@@ -570,6 +570,40 @@ export async function markDeliveredByVendor(id: string): Promise<VendorOrder> {
   return res.json();
 }
 
+// Fix the customer's name, phone or items before they've answered. A changed
+// phone number replaces the customer link.
+export async function updateOrderDetails(
+  id: string,
+  details: Partial<Pick<CreateOrderInput, "customerName" | "customerPhone" | "itemDescription">>,
+): Promise<VendorOrder> {
+  const res = await vendorFetch(`/orders/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(details),
+  });
+  if (res.status === 400) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) return conflictOrThrow(res, "PATCH order");
+  return res.json();
+}
+
+// Swap the rider on an order that hasn't been dispatched yet. The rider link
+// is replaced; the customer's link stays the same.
+export async function changeOrderRider(
+  id: string,
+  riderId: string,
+): Promise<VendorOrder> {
+  const res = await vendorFetch(`/orders/${encodeURIComponent(id)}/rider`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ riderId }),
+  });
+  if (!res.ok) return conflictOrThrow(res, "PATCH rider");
+  return res.json();
+}
+
 // Starting again with a fresh customer link. `riderId` picks a different rider
 // (one of the vendor's active ones); leave it out to keep the same rider.
 async function newAttempt(

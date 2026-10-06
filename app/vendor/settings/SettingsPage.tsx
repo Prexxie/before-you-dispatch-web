@@ -23,7 +23,7 @@ import { useLiveValidation } from "@/lib/useLiveValidation";
 import PasswordRules from "@/components/PasswordRules";
 import { PASSWORD_ERROR, PHONE_ERROR, isStrongPassword, isValidPhone } from "@/lib/validate";
 import AppShell from "@/components/AppShell";
-import { CheckIcon } from "@/components/icons";
+import { AddressPinIcon, CheckIcon } from "@/components/icons";
 
 // Design: "Vendor: Settings". The mockup shows both cards read-only with an
 // "Edit Profile" / "Change Password" button but no edit form itself — those
@@ -106,7 +106,10 @@ function ProfileCard({ vendor, onSaved }: { vendor: Vendor; onSaved: () => void 
       </div>
       <div className="readonly-row">
         <span className="readonly-label">ADDRESS</span>
-        <span className="readonly-val">{vendor.businessAddress}</span>
+        <span className="readonly-val">
+          <AddressPinIcon size={17} className="addr-pin" />
+          {vendor.businessAddress}
+        </span>
       </div>
       <div className="readonly-row">
         <span className="readonly-label">PHONE</span>
@@ -159,7 +162,14 @@ function ProfileEditForm({
   if (!businessAddress.trim()) errors.businessAddress = "Enter your business address.";
   if (businessPhone.trim() && !isValidPhone(businessPhone)) errors.businessPhone = PHONE_ERROR;
   if (category === "other" && !categoryOther.trim()) errors.categoryOther = "Tell us your business type.";
-  const live = useLiveValidation<ProfileFormFields | "category">(errors);
+  const live = useLiveValidation<ProfileFormFields | "category">(errors, {
+    businessName,
+    ownerName,
+    category,
+    categoryOther,
+    businessAddress,
+    businessPhone,
+  });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -436,7 +446,11 @@ function ChangePasswordForm({
   if (!isStrongPassword(newPassword)) errors.newPassword = PASSWORD_ERROR;
   if (!confirmPassword) errors.confirmPassword = "Type the new password again.";
   else if (newPassword !== confirmPassword) errors.confirmPassword = "The two passwords don't match.";
-  const live = useLiveValidation<PField>(errors);
+  const live = useLiveValidation<PField>(errors, {
+    currentPassword,
+    newPassword,
+    confirmPassword,
+  });
 
   async function submit(e: FormEvent) {
     e.preventDefault();

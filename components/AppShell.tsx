@@ -4,7 +4,7 @@ import { ThemeColor } from "@/lib/api";
 import { themeStyle } from "@/lib/theme";
 import Breadcrumbs, { Crumb } from "./Breadcrumbs";
 import { LogoMark } from "./icons";
-import LogoutButton from "./LogoutButton";
+import { ProfileBlock } from "./Profile";
 
 type Section = "dashboard" | "create" | "riders" | "settings";
 
@@ -80,7 +80,7 @@ export default function AppShell({
             Settings
           </Link>
           <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid var(--border)" }}>
-            <LogoutButton className="nav-item" style={{ color: "var(--ink-faint)" }} showIcon />
+            <ProfileBlock />
           </div>
         </nav>
 

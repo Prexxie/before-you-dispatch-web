@@ -1,7 +1,7 @@
 "use client";
 
 import LogoLoader from "@/components/LogoLoader";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import {
   Rider,
   ValidationError,
@@ -33,14 +33,32 @@ type RiderForm = { name: string; phone: string; vehicle: Vehicle };
 
 const EMPTY_FORM: RiderForm = { name: "", phone: "", vehicle: "bike" };
 
-// Design: "Vendor: Manage Riders". The table + form split, riders sorted by
-// name, both active and deactivated ones shown (a deactivated rider stays
+// Design: "Vendor: Manage Riders" / "Add Rider" / "Edit Rider". The table
+// alone by default; "+ Add Rider" or a row's "Edit" opens the form beside it.
+// Riders are sorted by name, both active and deactivated ones shown (a deactivated rider stays
 // visible here — just gone from the create-order dropdown — since their
 // past orders still reference them).
 export default function RidersPage() {
   const [refreshKey, setRefreshKey] = useState(0);
-  // The rider being edited in the form on the right; null means "add a rider".
-  const [editing, setEditing] = useState<Rider | null>(null);
+  // The form panel beside the table: closed (null) by default, "add" for a new
+  // rider, or the rider being edited. The table only gives up width while it's
+  // open.
+  const [panel, setPanel] = useState<"add" | Rider | null>(null);
+  // `open` drives the slide; `panel` keeps the form mounted while it slides out.
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function openPanel(next: "add" | Rider) {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setPanel(next);
+    // One frame later, so the collapsed state paints first and the change animates.
+    requestAnimationFrame(() => setOpen(true));
+  }
+
+  function closePanel() {
+    setOpen(false);
+    closeTimer.current = setTimeout(() => setPanel(null), 400);
+  }
   // Bumped after each save so the form starts fresh (no leftover "touched"
   // errors on the emptied fields).
   const [formVersion, setFormVersion] = useState(0);
@@ -69,15 +87,28 @@ export default function RidersPage() {
         <LogoLoader label="Loading riders…" page />
       ) : (
         <>
-          <p className="eyebrow">Your team</p>
-          <h1 className="h1">Riders</h1>
-          <p className="sub">
-            Add the riders you already work with. Once added, they&apos;ll show
-            up in the &quot;Assign a rider&quot; list when you create a
-            delivery.
-          </p>
+          <div className="flex items-start justify-between gap-6">
+            <div>
+              <p className="eyebrow">Your team</p>
+              <h1 className="h1">Riders</h1>
+              <p className="sub">
+                Add the riders you already work with. Once added, they&apos;ll
+                show up in the &quot;Assign a rider&quot; list when you create
+                a delivery.
+              </p>
+            </div>
+            {!open && (
+              <button
+                type="button"
+                onClick={() => openPanel("add")}
+                className="btn btn-primary whitespace-nowrap"
+              >
+                + Add Rider
+              </button>
+            )}
+          </div>
 
-          <div className="split-riders">
+          <div className="split-riders" data-open={open}>
             <div className="card" style={{ padding: "8px 24px" }}>
               {state.kind === "error" && (
                 <p className="sub" role="alert">
@@ -105,7 +136,7 @@ export default function RidersPage() {
                     </thead>
                     <tbody>
                       {riders.map((r) => (
-                        <RiderRow key={r.id} rider={r} onChanged={reload} onEdit={() => setEditing(r)} />
+                        <RiderRow key={r.id} rider={r} onChanged={reload} onEdit={() => openPanel(r)} />
                       ))}
                     </tbody>
                   </table>
@@ -113,17 +144,21 @@ export default function RidersPage() {
               )}
             </div>
 
-            <RiderFormCard
-              // A fresh form for each rider picked (or for "add").
-              key={`${editing?.id ?? "new"}-${formVersion}`}
-              rider={editing}
-              onDone={() => {
-                setEditing(null);
-                setFormVersion((v) => v + 1);
-                reload();
-              }}
-              onCancel={() => setEditing(null)}
-            />
+            <div className="riders-panel" aria-hidden={!open}>
+              {panel && (
+                <RiderFormCard
+                  // A fresh form for each rider picked (or for "add").
+                  key={`${panel === "add" ? "new" : panel.id}-${formVersion}`}
+                  rider={panel === "add" ? null : panel}
+                  onDone={() => {
+                    closePanel();
+                    setFormVersion((v) => v + 1);
+                    reload();
+                  }}
+                  onCancel={closePanel}
+                />
+              )}
+            </div>
           </div>
         </>
       )}
@@ -223,7 +258,7 @@ function RiderFormCard({
   if (!form.name.trim()) errors.name = "Enter the rider's name.";
   if (!form.phone.trim()) errors.phone = "Enter the rider's phone number.";
   else if (!isValidPhone(form.phone)) errors.phone = PHONE_ERROR;
-  const live = useLiveValidation<Field>(errors);
+  const live = useLiveValidation<Field>(errors, form);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -265,9 +300,21 @@ function RiderFormCard({
 
   return (
     <form onSubmit={submit} noValidate className="card">
-      <p className="h2" style={{ fontSize: 16 }}>
-        {rider ? "Edit rider" : "Add a rider"}
-      </p>
+      <div className="flex items-start justify-between">
+        <p className="h2" style={{ fontSize: 16 }}>
+          {rider ? "Edit rider" : "Add a rider"}
+        </p>
+        <button
+          type="button"
+          onClick={onCancel}
+          aria-label="Close"
+          className="panel-close"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
       <p className="sub" style={{ marginBottom: 18 }}>
         {rider
           ? "Changes show on this rider's future links and the Assign a rider list."

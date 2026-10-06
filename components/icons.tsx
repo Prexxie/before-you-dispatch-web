@@ -26,11 +26,21 @@ export function LogoMark({ size = 20, className }: IconProps) {
 export const MAP_PIN_SVG = `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="${PIN_PATH}" fill="#9F1239"/><circle cx="12" cy="10" r="3" fill="#ffffff"/></svg>`;
 
 // Stroked pin outline: the "rider has arrived" state icon.
-export function PinIcon({ size = 24 }: IconProps) {
+export function PinIcon({ size = 24, className }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
       <path d={PIN_PATH} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
       <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+// Solid crimson pin with a white dot, for in front of a business address.
+export function AddressPinIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+      <path d={PIN_PATH} fill="#9F1239" />
+      <circle cx="12" cy="10" r="3" fill="#ffffff" />
     </svg>
   );
 }

@@ -164,7 +164,7 @@ function AccountStep({
   if (!form.email.trim()) errors.email = "Enter your email address.";
   else if (!isValidEmail(form.email)) errors.email = EMAIL_ERROR;
   if (!isStrongPassword(form.password)) errors.password = PASSWORD_ERROR;
-  const live = useLiveValidation<Field>(errors);
+  const live = useLiveValidation<Field>(errors, form);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -321,7 +321,7 @@ function WorkspaceStep({
   const [error, setError] = useState<string | null>(null);
   const live = useLiveValidation<"businessAddress">({
     businessAddress: businessAddress.trim() ? undefined : "Enter your business address.",
-  });
+  }, { businessAddress });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -439,7 +439,13 @@ function GoogleSetupStep({ setup, onBack }: { setup: GoogleSetup; onBack: () => 
   if (!category) errors.category = "Choose what kind of business you run.";
   if (category === "other" && !categoryOther.trim()) errors.categoryOther = "Tell us your business type.";
   if (!businessAddress.trim()) errors.businessAddress = "Enter your business address.";
-  const live = useLiveValidation<GField>(errors);
+  const live = useLiveValidation<GField>(errors, {
+    businessName,
+    ownerName,
+    category,
+    categoryOther,
+    businessAddress,
+  });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
