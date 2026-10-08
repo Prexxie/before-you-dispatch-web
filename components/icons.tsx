@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 // Icons from the screen designs (Before You Dispatch — Wireframes v2), so
 // every screen draws them the same way.
 
@@ -82,12 +84,143 @@ export function PackageIcon({ size = 14 }: IconProps) {
   );
 }
 
+// A motorbike (side view): two wheels, a solid tank with the seat behind it,
+// handlebars at the front. Chosen by the user 8 Oct.
 export function RiderIcon({ size = 14 }: IconProps) {
   return (
-    <svg className="icon" width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="6" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
-      <circle cx="18" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
-      <path d="M6 17l4-8h4l4 8M10 9h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg
+      className="icon"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="5.5" cy="15.5" r="3.3" />
+      <circle cx="18.5" cy="15.5" r="3.3" />
+      <path d="M2.8 10.2h6" />
+      <path d="M8.8 10.2c1-1.3 3.4-1.9 6.2-1.4l-2.8 4.4H9.6z" fill="currentColor" />
+      <path d="M5.5 15.5l4.1-2.3M18.5 15.5L15.1 7.2M13.7 7.2h2.8" />
+    </svg>
+  );
+}
+
+// The motorbike with a helmeted rider on it, for larger pictures (the
+// landing page's hero drive). The small icon above stays bike-only, since a
+// figure doesn't read at label size. The visor is white.
+export function RiderOnBikeIcon({ size = 46 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <g stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="5.5" cy="18.5" r="3.3" />
+        <circle cx="18.5" cy="18.5" r="3.3" />
+        <path d="M2.8 13.2h6" />
+        <path d="M8.8 13.2c1-1.3 3.4-1.9 6.2-1.4l-2.8 4.4H9.6z" fill="currentColor" />
+        <path d="M5.5 18.5l4.1-2.3M18.5 18.5L15.1 10.2M13.7 10.2h2.8" />
+        {/* Rider: body leaning forward, arm to the handlebar, knee on the tank. */}
+        <path d="M7.6 12.4L10.6 7.6" strokeWidth="2.6" />
+        <path d="M10.8 8l3.6 2.2M8 12.6l3.4 1.6-.9 2.6" />
+      </g>
+      <circle cx="11.8" cy="5" r="2.6" fill="currentColor" />
+      <path d="M12.4 4.7h2.2" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// Dashboard stat tiles (design: "Vendor: Dashboard"): orders today (a
+// parcel), awaiting confirmation (an hourglass), out for delivery (the
+// RiderIcon), delivered today (a pin with a tick).
+const STROKE = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+} as const;
+
+// Orders today: a shaded 3D parcel (light lid, two side tones, a tape strip)
+// with a small sparkle for new orders. Drawn in currentColor (the tile's
+// pink); the sparkle twinkles while there are orders today.
+export function ParcelIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 11.6L3.6 7.2v9.4L12 21z" fill="currentColor" />
+      <path d="M12 11.6l8.4-4.4v9.4L12 21z" fill="currentColor" opacity="0.72" />
+      <path d="M12 3l8.4 4.2L12 11.6 3.6 7.2z" fill="currentColor" opacity="0.35" />
+      <path d="M7.8 5.1l8.4 4.3v3.4l-2 1v-3.3L5.8 6.1z" fill="#fff" opacity="0.55" />
+      <path
+        className="sparkle"
+        d="M19.6 1.6l.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+// Waiting for the customer to confirm: an hourglass with a crisp outline in
+// currentColor (the tile's amber) and the sand in shades of amber, light at
+// the top and deeper in the pile. While any order is waiting, a drop of sand
+// falls through the middle (`.drop`).
+export function HourglassIcon({ size = 24 }: IconProps) {
+  const id = useId();
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={`${id}t`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fcd34d" />
+          <stop offset="1" stopColor="#f59e0b" />
+        </linearGradient>
+        <linearGradient id={`${id}b`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f59e0b" />
+          <stop offset="1" stopColor="#b45309" />
+        </linearGradient>
+      </defs>
+      <path d="M8.6 7.4h6.8c-.7 1.2-2 2.2-3.4 3.2-1.4-1-2.7-2-3.4-3.2z" fill={`url(#${id}t)`} />
+      <path d="M12 15c1.7.8 3.3 1.9 3.8 3.6H8.2c.5-1.7 2.1-2.8 3.8-3.6z" fill={`url(#${id}b)`} />
+      <circle className="drop" cx="12" cy="13.7" r="0.75" fill="#f59e0b" />
+      <path
+        d="M7 4.8v1c0 2.7 3.1 4.6 4.4 6.2-1.3 1.6-4.4 3.5-4.4 6.2v1M17 4.8v1c0 2.7-3.1 4.6-4.4 6.2 1.3 1.6 4.4 3.5 4.4 6.2v1"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x="5" y="2.3" width="14" height="2.7" rx="1.35" fill="currentColor" />
+      <rect x="5" y="19" width="14" height="2.7" rx="1.35" fill="currentColor" />
+    </svg>
+  );
+}
+
+// Delivered: a solid map pin with a big tick in a white circle (the user's
+// pick, 8 Oct; echoes the logo's pin). A round head on a slim point, a soft
+// sheen at the top and a small shadow underneath, like it's sitting on the
+// map. Drawn in currentColor, so it takes the tile's green.
+export function PinTickIcon({ size = 24 }: IconProps) {
+  const sheen = useId();
+  const pin = "M11.2 20.3L6.4 14.4A7.4 7.4 0 1 1 17.6 14.4L12.8 20.3Q12 21.3 11.2 20.3Z";
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={sheen} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.32" />
+          <stop offset="0.55" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <ellipse cx="12" cy="22.2" rx="3.2" ry="0.9" fill="currentColor" opacity="0.22" />
+      <path d={pin} fill="currentColor" />
+      <path d={pin} fill={`url(#${sheen})`} />
+      <circle cx="12" cy="9.6" r="5.3" fill="#fff" />
+      <path
+        d="M9.3 9.8l2 2 3.6-3.7"
+        stroke="currentColor"
+        strokeWidth="2.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

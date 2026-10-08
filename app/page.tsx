@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { LogoMark } from "@/components/icons";
+import { LogoMark, RiderIcon, RiderOnBikeIcon } from "@/components/icons";
 import { BRAND_NAME, TAGLINE } from "@/lib/brand";
-import { CountUp, NavShadow, ScrollReveal } from "@/components/LandingMotion";
+import { CountUp, NavShadow, RouteRider, ScrollReveal } from "@/components/LandingMotion";
 
 export const metadata: Metadata = {
   title: `${BRAND_NAME}: ${TAGLINE}`,
@@ -49,6 +49,9 @@ export default function Home() {
         <svg className="lp-route-bg" viewBox="0 0 1280 560" preserveAspectRatio="none" fill="none" aria-hidden="true">
           <path d="M-20 470 C 220 380, 340 520, 560 400 S 900 280, 1300 120" stroke="#9AD3BC" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
+        <RouteRider route=".lp-route-bg path" startOn="load" className="hero">
+          <RiderOnBikeIcon size={56} />
+        </RouteRider>
         <div className="lp-hero-copy">
           <p className="eyebrow lp-rise d1">For vendors, customers &amp; riders</p>
           <p className="lp-h1 lp-rise d2">
@@ -207,6 +210,7 @@ export default function Home() {
 
 <div className="lp-cta-band">
 <svg className="lp-cta-route" viewBox="0 0 520 200" fill="none" aria-hidden="true"><path d="M10 170 C 120 170, 140 60, 250 90 S 400 150, 470 60" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="6 10"></path><circle cx="10" cy="170" r="6" stroke="#ffffff" strokeWidth="2.5"></circle><g transform="translate(452,18) scale(1.5)"><path d="M12 2C7.58 2 4 5.58 4 10c0 5.25 6.72 11.19 7.01 11.44a1.5 1.5 0 0 0 1.98 0C13.28 21.19 20 15.25 20 10c0-4.42-3.58-8-8-8z" fill="#ffffff"></path><circle cx="12" cy="10" r="3" fill="#065F46"></circle></g></svg>
+<RouteRider route=".lp-cta-route path" startOn="view" className="cta" duration={6000}><RiderOnBikeIcon size={40} /></RouteRider>
 <div className="lp-cta-copy"><h3>Ready to stop wasting trips?</h3><p>Set up your first confirmed delivery in under three minutes. No app for your customers, and it works with the riders you already have.</p></div>
 <Link href="/vendor/signup" className="btn btn-primary lp-cta-btn">Get Started, Free<svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"></path></svg></Link>
 </div>
@@ -278,11 +282,7 @@ function HeroDemo() {
           </p>
           <div className="lp-lane">
             <span className="rider">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle cx="6" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
-                <circle cx="18" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
-                <path d="M6 17l4-8h4l4 8M10 9h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <RiderIcon size={16} />
             </span>
           </div>
         </div>

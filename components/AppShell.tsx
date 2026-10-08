@@ -1,9 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { ReactNode } from "react";
 import { ThemeColor } from "@/lib/api";
+import { AttentionPill, useAttentionCount } from "./AttentionCount";
 import { themeStyle } from "@/lib/theme";
 import Breadcrumbs, { Crumb } from "./Breadcrumbs";
-import { LogoMark } from "./icons";
+import { LogoMark, RiderIcon } from "./icons";
 import { ProfileBlock } from "./Profile";
 
 type Section = "dashboard" | "create" | "riders" | "settings";
@@ -35,6 +38,7 @@ export default function AppShell({
   themeColor?: ThemeColor;
   children: ReactNode;
 }) {
+  const attention = useAttentionCount();
   return (
     <div className="page">
       <div className="app-shell" style={themeColor ? themeStyle(themeColor) : undefined}>
@@ -54,6 +58,7 @@ export default function AppShell({
           >
             <GridIcon />
             Dashboard
+            <AttentionPill count={attention} />
           </Link>
           <Link
             href="/vendor/orders/new"
@@ -89,6 +94,7 @@ export default function AppShell({
             <Link href="/vendor" className="app-topbar-brand items-center gap-2 font-bold text-ink">
               <LogoMark size={18} />
               WakaRoute
+              <AttentionPill count={attention} />
             </Link>
             <Breadcrumbs
               items={trail(active, title)}
@@ -130,13 +136,7 @@ function PlusIcon() {
 }
 
 function BikeIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="6" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
-      <circle cx="18" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
-      <path d="M6 17l4-8h4l4 8M10 9h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <RiderIcon size={16} />;
 }
 
 function GearIcon() {

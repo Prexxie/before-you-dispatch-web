@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 import Breadcrumbs, { Crumb } from "./Breadcrumbs";
+import { LiveAttentionPill } from "./AttentionCount";
 import { LogoMark } from "./icons";
 import { ProfileMenu } from "./Profile";
 
@@ -25,6 +26,7 @@ export default function VendorShell({
         <div className="row-flex" style={{ gap: 20, alignItems: "center" }}>
           <Link href="/vendor" className="navlink">
             Dashboard
+            <LiveAttentionPill />
           </Link>
           <ProfileMenu />
         </div>

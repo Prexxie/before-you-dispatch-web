@@ -147,6 +147,8 @@ export type VendorOrder = {
   notReadyAt: string | null;
   locationSavedAt: string | null;
   dispatchedAt: string | null;
+  // Set when the rider tapped "Accept Delivery".
+  acceptedAt: string | null;
   pickedUpAt: string | null;
   arrivedAt: string | null;
   receivedAt: string | null;
@@ -154,6 +156,10 @@ export type VendorOrder = {
   failureReason: FailureReason | null;
   failureNote: string | null;
   deliveryConfirmedBy: DeliveryConfirmer | null;
+  // Set when the rider tapped "Decline Delivery" (the order is back to
+  // confirmed) until the vendor picks another rider or sends the link again.
+  riderDeclinedAt: string | null;
+  declinedRiderName: string | null;
   vendor: VendorInfo | null;
   // 1 for the first delivery attempt; goes up on each redelivery.
   attempt: number;
@@ -165,6 +171,10 @@ export type VendorOrder = {
 };
 
 export type OrderAttempt = {
+  // "failed": the rider couldn't deliver (kept on redeliver). "declined": the
+  // customer said "Not now" (kept on retrigger); no reason, rider leg or pin.
+  outcome: "failed" | "declined";
+  // The delivery attempt it belonged to; a decline doesn't use one up.
   attemptNumber: number;
   riderName: string;
   failureReason: FailureReason | null;
@@ -191,6 +201,8 @@ export type RiderJob = {
   vendorName: string | null;
   // The pickup point.
   vendor: VendorInfo | null;
+  // Set once the rider taps "Accept Delivery"; until then the page asks.
+  acceptedAt: string | null;
   // Set once the rider confirms they collected the order.
   pickedUpAt: string | null;
   // Set once the rider taps "I've arrived" at the customer's location.
@@ -198,9 +210,6 @@ export type RiderJob = {
   // Set once the customer confirms receipt; completing needs it.
   receivedAt: string | null;
   deliveryConfirmedBy: DeliveryConfirmer | null;
-  // The vendor opened their own rider link while signed in. A rider opening
-  // a confirmed order's link marks it dispatched; the vendor's preview doesn't.
-  vendorPreview: boolean;
 };
 
 // A 409 from the API: the order is in a state that doesn't allow this.
@@ -416,6 +425,29 @@ export async function getRiderJob(token: string): Promise<RiderJob> {
   return res.json();
 }
 
+// The rider takes the job ("Accept Delivery"). Marks the order dispatched
+// too if the vendor pasted the link without using the send buttons.
+export async function acceptJob(
+  token: string,
+): Promise<{ acceptedAt: string; status: OrderStatus }> {
+  const res = await fetch(
+    `${API_URL}/rider/${encodeURIComponent(token)}/accept`,
+    { method: "POST" },
+  );
+  if (!res.ok) return conflictOrThrow(res, "POST accept");
+  return res.json();
+}
+
+// The rider declines the job. The order goes back to the vendor to pick
+// another rider, and this rider's link stops working.
+export async function declineJob(token: string): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/rider/${encodeURIComponent(token)}/decline`,
+    { method: "POST" },
+  );
+  if (!res.ok) return conflictOrThrow(res, "POST decline");
+}
+
 // The rider confirms they've collected the order from the vendor. Resolves
 // to the now-unlocked pin.
 export async function confirmPickup(
@@ -495,9 +527,13 @@ export type OrderSummary = {
   riderName: string;
   status: OrderStatus;
   hasLocation: boolean;
+  acceptedAt: string | null;
   pickedUpAt: string | null;
   arrivedAt: string | null;
   receivedAt: string | null;
+  // The rider declined; the vendor needs to pick another.
+  riderDeclinedAt: string | null;
+  declinedRiderName: string | null;
   failureReason: FailureReason | null;
   deliveryConfirmedBy: DeliveryConfirmer | null;
   createdAt: string;
@@ -529,17 +565,53 @@ export type OrderList = {
     delivered: number;
     failed: number;
   };
+  // "Needs your attention": today's orders waiting on the vendor, oldest first (at
+  // most 6; `needsYouTotal` counts them all).
+  needsYou: NeedsYouItem[];
+  needsYouTotal: number;
   page: number;
   pageSize: number;
   totalPages: number;
   orders: OrderSummary[];
 };
 
+export type NeedsYouItem = {
+  id: string;
+  orderNumber: number;
+  customerName: string;
+  riderName: string;
+  // What the vendor has to do next.
+  kind: "ready_to_send" | "rider_declined" | "failed" | "customer_declined";
+  declinedRiderName: string | null;
+  failureReason: FailureReason | null;
+  // When it started waiting on the vendor.
+  since: string;
+  // "ready_to_send" only: what the card needs to send the rider link on
+  // WhatsApp itself, with the same message as the order page.
+  send: {
+    riderToken: string;
+    riderPhone: string;
+    itemDescription: string;
+    attempt: number;
+  } | null;
+};
+
+// How many orders need the vendor's attention right now (the count on the
+// Dashboard link and in the tab title).
+export async function getAttentionCount(): Promise<number> {
+  const res = await vendorFetch("/orders/attention", { cache: "no-store" });
+  if (!res.ok) throw new Error(`GET attention failed: ${res.status}`);
+  const body: { total: number } = await res.json();
+  return body.total;
+}
+
 export async function getOrders(
-  opts: { status?: OrderStatus; page?: number } = {},
+  // `today`: only orders created today, the set the stat tiles count.
+  opts: { status?: OrderStatus; page?: number; today?: boolean } = {},
 ): Promise<OrderList> {
   const params = new URLSearchParams();
   if (opts.status) params.set("status", opts.status);
+  if (opts.today) params.set("today", "true");
   if (opts.page && opts.page > 1) params.set("page", String(opts.page));
   const qs = params.toString();
   const res = await vendorFetch(`/orders${qs ? `?${qs}` : ""}`, {
