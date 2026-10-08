@@ -586,7 +586,24 @@ export type NeedsYouItem = {
   failureReason: FailureReason | null;
   // When it started waiting on the vendor.
   since: string;
+  // "ready_to_send" only: what the card needs to send the rider link on
+  // WhatsApp itself, with the same message as the order page.
+  send: {
+    riderToken: string;
+    riderPhone: string;
+    itemDescription: string;
+    attempt: number;
+  } | null;
 };
+
+// How many orders need the vendor's attention right now (the count on the
+// Dashboard link and in the tab title).
+export async function getAttentionCount(): Promise<number> {
+  const res = await vendorFetch("/orders/attention", { cache: "no-store" });
+  if (!res.ok) throw new Error(`GET attention failed: ${res.status}`);
+  const body: { total: number } = await res.json();
+  return body.total;
+}
 
 export async function getOrders(
   // `today`: only orders created today, the set the stat tiles count.

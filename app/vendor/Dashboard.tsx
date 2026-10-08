@@ -11,12 +11,14 @@ import {
   OrderStatus,
   categoryLabel,
   VendorInfo,
+  dispatchOrder,
   getMe,
   getOrders,
 } from "@/lib/api";
+import { riderLink, riderMessage, whatsappLink } from "@/lib/links";
 import { useLiveData } from "@/lib/useLiveData";
 import { statusBadge } from "@/lib/statusBadge";
-import { formatDayTime, formatTime } from "@/lib/time";
+import { formatDayTime } from "@/lib/time";
 import { WELCOME_LOADING, WELCOME_TITLE } from "@/lib/brand";
 import { initials } from "@/lib/format";
 import AppShell from "@/components/AppShell";
@@ -27,6 +29,7 @@ import {
   ParcelIcon,
   PinTickIcon,
   RiderIcon,
+  WhatsAppIcon,
 } from "@/components/icons";
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0];
@@ -41,7 +44,9 @@ export default function Dashboard({ welcome = false }: { welcome?: boolean }) {
   // the tiles count. The filter chips below show all-time orders.
   const [todayOnly, setTodayOnly] = useState(false);
   const [page, setPage] = useState(1);
-  const key = `${filter}-${todayOnly}-${page}`;
+  // Bumped after the card sends a rider link, so the list reloads at once.
+  const [refresh, setRefresh] = useState(0);
+  const key = `${filter}-${todayOnly}-${page}-${refresh}`;
   // Drop ?welcome=1 from the address straight away (the flag is already
   // read), so a later reload shows the normal loader.
   useEffect(() => {
@@ -106,6 +111,8 @@ export default function Dashboard({ welcome = false }: { welcome?: boolean }) {
           onTileSelect={selectTile}
           page={page}
           onPageChange={setPage}
+          sender={me ? firstName(me.ownerName) : null}
+          onRefresh={() => setRefresh((r) => r + 1)}
         />
       )}
     </AppShell>
@@ -177,6 +184,8 @@ function Board({
   onTileSelect,
   page,
   onPageChange,
+  sender,
+  onRefresh,
 }: {
   data: OrderList;
   filter: Filter;
@@ -185,6 +194,8 @@ function Board({
   onTileSelect: (f: Filter) => void;
   page: number;
   onPageChange: (p: number) => void;
+  sender: string | null;
+  onRefresh: () => void;
 }) {
   const router = useRouter();
   const { today, counts, orders, totalPages } = data;
@@ -196,7 +207,13 @@ function Board({
 
   return (
     <>
-      <NeedsYou items={data.needsYou} total={data.needsYouTotal} />
+      <NeedsYou
+        items={data.needsYou}
+        total={data.needsYouTotal}
+        vendor={data.vendor}
+        sender={sender}
+        onSent={onRefresh}
+      />
 
       <div className="stat-row">
         <Stat
@@ -230,7 +247,6 @@ function Board({
         />
       </div>
 
-      <p className="eyebrow">Live</p>
       <div className="orders-head" id="orders">
         <h2 className="h2" style={{ margin: 0 }}>
           {todayOnly
@@ -458,30 +474,90 @@ const NEEDS_YOU: Record<
   },
 };
 
-function NeedsYou({ items, total }: { items: NeedsYouItem[]; total: number }) {
+// How long an order has waited on the vendor, and how urgent that looks:
+// grey at first, amber after 15 minutes, red after 30. A customer who said
+// they're ready half an hour ago with no rider sent is the wasted moment the
+// product exists to prevent.
+function waiting(since: string): { label: string; tone: "" | "late" | "overdue" } {
+  const mins = Math.max(0, Math.floor((Date.now() - new Date(since).getTime()) / 60_000));
+  const label =
+    mins < 1
+      ? "Just now"
+      : mins < 60
+        ? `Waiting ${mins} min`
+        : `Waiting ${Math.floor(mins / 60)} h${mins % 60 ? ` ${mins % 60} min` : ""}`;
+  return { label, tone: mins >= 30 ? "overdue" : mins >= 15 ? "late" : "" };
+}
+
+function NeedsYou({
+  items,
+  total,
+  vendor,
+  sender,
+  onSent,
+}: {
+  items: NeedsYouItem[];
+  total: number;
+  vendor: VendorInfo | null;
+  sender: string | null;
+  onSent: () => void;
+}) {
+  // Closed by default (the user's call, 8 Oct): a slim bar whose count
+  // shakes now and then; "Show" opens the list (design: "Vendor: Needs Your
+  // Attention (opened)").
+  const [open, setOpen] = useState(false);
   if (total === 0) return null;
+  const longest = items[0] ? waiting(items[0].since) : null;
   return (
-    <section className="needs" aria-labelledby="needs-title">
-      <div className="needs-head">
+    <section className={`needs${open ? "" : " needs-closed"}`} aria-labelledby="needs-title">
+      <button
+        type="button"
+        className="needs-toggle"
+        aria-expanded={open}
+        aria-controls="needs-list"
+        onClick={() => setOpen((o) => !o)}
+      >
         <h2 id="needs-title">Needs your attention</h2>
-        <span className="needs-count">{total}</span>
-        <span className="needs-sub">Oldest first</span>
-      </div>
+        {/* Keyed on the number so the shake starts over when it changes. */}
+        <span key={total} className="needs-count shake">
+          {total}
+        </span>
+        <span className={`needs-sub ${open ? "" : (longest?.tone ?? "")}`}>
+          {open
+            ? "Longest waiting first"
+            : longest && longest.label !== "Just now"
+              ? `Longest ${longest.label.toLowerCase()}`
+              : "Just now"}
+        </span>
+        <span className="needs-show">
+          {open ? "Hide" : "Show"}
+          <ChevronIcon />
+        </span>
+      </button>
+      <div id="needs-list" hidden={!open}>
       {items.map((i) => {
         const kind = NEEDS_YOU[i.kind];
+        const wait = waiting(i.since);
         return (
           <div key={i.id} className="needs-row">
             <span className="needs-dot" style={{ background: kind.dot }} aria-hidden="true" />
             <span className="needs-text">
-              {kind.text(i)} &middot; #{i.orderNumber}
+              {kind.text(i)} &middot;{" "}
+              <Link href={`/vendor/orders/${i.id}`} className="needs-order">
+                #{i.orderNumber}
+              </Link>
             </span>
-            <span className="needs-when">{formatTime(i.since)}</span>
-            <Link
-              href={`/vendor/orders/${i.id}`}
-              className={`btn ${kind.primary ? "btn-primary" : "btn-secondary"} needs-btn`}
-            >
-              {kind.action(i)}
-            </Link>
+            <span className={`needs-when ${wait.tone}`}>{wait.label}</span>
+            {i.kind === "ready_to_send" && i.send ? (
+              <SendOnWhatsApp item={i} send={i.send} vendor={vendor} sender={sender} onSent={onSent} />
+            ) : (
+              <Link
+                href={`/vendor/orders/${i.id}`}
+                className={`btn ${kind.primary ? "btn-primary" : "btn-secondary"} needs-btn`}
+              >
+                {kind.action(i)}
+              </Link>
+            )}
           </div>
         );
       })}
@@ -490,6 +566,74 @@ function NeedsYou({ items, total }: { items: NeedsYouItem[]; total: number }) {
           And {total - items.length} more. They&apos;re in the list below.
         </p>
       )}
+      </div>
     </section>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// "Ifeoma is ready": send the rider link on WhatsApp right from the card,
+// with the same message as the order page, and mark the order Dispatched
+// (decided 28 Sep: sending the rider link dispatches). The order number
+// still opens the order for the SMS or copy options.
+function SendOnWhatsApp({
+  item,
+  send,
+  vendor,
+  sender,
+  onSent,
+}: {
+  item: NeedsYouItem;
+  send: NonNullable<NeedsYouItem["send"]>;
+  vendor: VendorInfo | null;
+  sender: string | null;
+  onSent: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const rider = firstName(item.riderName);
+  const message = riderMessage(
+    riderLink(send.riderToken),
+    {
+      orderNumber: item.orderNumber,
+      customerName: item.customerName,
+      itemDescription: send.itemDescription,
+      rider: { name: item.riderName },
+      attempt: send.attempt,
+    },
+    vendor,
+    sender,
+  );
+  return (
+    <>
+      <a
+        href={whatsappLink(send.riderPhone, message)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="btn btn-primary needs-btn"
+        onClick={() => {
+          setError(null);
+          dispatchOrder(item.id)
+            .then(onSent)
+            .catch(() =>
+              setError("WhatsApp opened, but we couldn't mark it Dispatched. Open the order to try again."),
+            );
+        }}
+      >
+        <WhatsAppIcon />
+        WhatsApp {rider}
+      </a>
+      {error && (
+        <p className="needs-error" role="alert">
+          {error}
+        </p>
+      )}
+    </>
   );
 }

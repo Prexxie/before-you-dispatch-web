@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { ReactNode } from "react";
 import { ThemeColor } from "@/lib/api";
+import { AttentionPill, useAttentionCount } from "./AttentionCount";
 import { themeStyle } from "@/lib/theme";
 import Breadcrumbs, { Crumb } from "./Breadcrumbs";
 import { LogoMark, RiderIcon } from "./icons";
@@ -35,6 +38,7 @@ export default function AppShell({
   themeColor?: ThemeColor;
   children: ReactNode;
 }) {
+  const attention = useAttentionCount();
   return (
     <div className="page">
       <div className="app-shell" style={themeColor ? themeStyle(themeColor) : undefined}>
@@ -54,6 +58,7 @@ export default function AppShell({
           >
             <GridIcon />
             Dashboard
+            <AttentionPill count={attention} />
           </Link>
           <Link
             href="/vendor/orders/new"
@@ -89,6 +94,7 @@ export default function AppShell({
             <Link href="/vendor" className="app-topbar-brand items-center gap-2 font-bold text-ink">
               <LogoMark size={18} />
               WakaRoute
+              <AttentionPill count={attention} />
             </Link>
             <Breadcrumbs
               items={trail(active, title)}

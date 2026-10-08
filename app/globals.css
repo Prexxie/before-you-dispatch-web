@@ -1364,6 +1364,25 @@ body {
   .nav-item:hover {
     opacity: 1;
   }
+  /* Orders needing the vendor's attention (AppShell). */
+  .nav-count {
+    margin-left: auto;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #b45309;
+    color: #ffffff;
+    font-size: 11.5px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+  }
+  .app-topbar-brand .nav-count {
+    margin-left: 4px;
+  }
   .nav-item.active {
     background: #ffffff;
     opacity: 1;
@@ -1578,13 +1597,81 @@ body {
     margin-bottom: 22px;
     box-shadow: 0 10px 24px -18px rgba(180, 83, 9, 0.45);
   }
-  .needs-head {
+  /* The header is the open/close button; closed, the card is just this bar. */
+  .needs-toggle {
+    width: 100%;
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 6px;
+    padding: 0 0 8px 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
-  .needs-head h2 {
+  .needs-closed {
+    padding: 0;
+  }
+  .needs-closed .needs-toggle {
+    padding: 14px 22px;
+  }
+  .needs-toggle:focus-visible {
+    outline: 2px solid #b45309;
+    outline-offset: 2px;
+    border-radius: 12px;
+  }
+  .needs-show {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--brand);
+  }
+  .needs-show svg {
+    transition: transform 0.2s ease;
+  }
+  .needs-toggle[aria-expanded="true"] .needs-show svg {
+    transform: rotate(180deg);
+  }
+  .needs-sub.late {
+    color: #b45309;
+  }
+  .needs-sub.overdue {
+    color: #b91c1c;
+  }
+  /* The attention counts shake to catch the eye: every 2.5 s a quick
+     side-to-side jiggle (like a phone buzzing) while an amber ring ripples
+     out, then rest. A rotation alone barely showed on a round badge. */
+  .needs-count.shake,
+  .nav-count {
+    animation:
+      attn-shake 2.5s ease-in-out infinite,
+      attn-ring 2.5s ease-out infinite;
+  }
+  @keyframes attn-shake {
+    0%, 30%, 100% { transform: none; }
+    4% { transform: translateX(-3px) rotate(-10deg); }
+    8% { transform: translateX(3px) rotate(10deg); }
+    12% { transform: translateX(-3px) rotate(-8deg); }
+    16% { transform: translateX(3px) rotate(6deg); }
+    20% { transform: translateX(-2px) rotate(-3deg); }
+    24% { transform: translateX(1px); }
+  }
+  @keyframes attn-ring {
+    0% { box-shadow: 0 0 0 0 rgba(180, 83, 9, 0.55); }
+    40% { box-shadow: 0 0 0 9px rgba(180, 83, 9, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(180, 83, 9, 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .needs-count.shake,
+    .nav-count {
+      animation: none;
+    }
+  }
+  .needs-toggle h2 {
     font-size: 15px;
     font-weight: 700;
     color: var(--ink);
@@ -1612,6 +1699,7 @@ body {
   }
   .needs-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
     padding: 12px 0;
@@ -1628,12 +1716,40 @@ body {
   .needs-row strong {
     color: var(--ink);
   }
+  /* How long it has waited: grey, then amber after 15 min, red after 30. */
   .needs-when {
     margin-left: auto;
-    font-size: 12.5px;
-    color: var(--ink-faint);
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 700;
     white-space: nowrap;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #f3f1ec;
+    color: #6b6558;
+  }
+  .needs-when.late {
+    background: #fef3c7;
+    color: #b45309;
+  }
+  .needs-when.overdue {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+  .needs-order {
+    color: var(--ink-soft);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .needs-error {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--danger);
+  }
+  .navlink .nav-count {
+    margin-left: 6px;
+    vertical-align: 1px;
   }
   .needs-btn {
     min-height: 36px;
@@ -1888,6 +2004,18 @@ body {
     /* Phones: the message on its own line, then the time and the button. */
     .needs {
       padding: 16px 16px 6px 16px;
+    }
+    .needs-closed {
+      padding: 0;
+    }
+    .needs-closed .needs-toggle {
+      padding: 12px 16px;
+    }
+    .needs-closed .needs-sub {
+      display: none;
+    }
+    .needs-closed .needs-show {
+      margin-left: auto;
     }
     .needs-row {
       flex-wrap: wrap;
