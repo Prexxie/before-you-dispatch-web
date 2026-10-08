@@ -4,7 +4,7 @@ import { MAP_ATTRIBUTION, MAP_ATTRIBUTION_URL } from "@/lib/mapConfig";
 import dynamic from "next/dynamic";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import type { LatLng } from "@/components/PinMap";
-import { Place, searchPlaces, suggestPlaces } from "@/lib/geocode";
+import { Place, addressAt, searchPlaces, suggestPlaces } from "@/lib/geocode";
 import {
   ConfirmationDetails,
   LocationInput,
@@ -339,8 +339,24 @@ function PinEditor({
   // Filled from the search result they pick; editable, since a search result
   // rarely has the exact house number ("5, Temidire Street").
   const [address, setAddress] = useState(start?.address ?? "");
+  // Once they type their own address, moving the pin stops overwriting it.
+  const addressTyped = useRef(false);
+  const addressAbort = useRef<AbortController | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Fill the address for wherever the pin lands (drag, tap or phone location).
+  // Newest lookup wins; a failed lookup leaves what's there.
+  async function fillAddress(at: LatLng) {
+    if (addressTyped.current) return;
+    addressAbort.current?.abort();
+    const ctrl = new AbortController();
+    addressAbort.current = ctrl;
+    const found = await addressAt(at, ctrl.signal);
+    if (found && !ctrl.signal.aborted && !addressTyped.current) {
+      setAddress(found.slice(0, ADDRESS_MAX_LENGTH));
+    }
+  }
 
   function moveTo(next: LatLng) {
     setPin(next);
@@ -352,13 +368,16 @@ function PinEditor({
     setPin(next);
     setSource(null);
     setShowTip(false);
+    fillAddress(next);
   }
 
   // State only changes in the callbacks, so this is safe to call from an effect.
   function requestPosition() {
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        moveTo({ lat: coords.latitude, lng: coords.longitude });
+        const here = { lat: coords.latitude, lng: coords.longitude };
+        moveTo(here);
+        fillAddress(here);
         setSource("current");
         setLocating(false);
       },
@@ -522,6 +541,8 @@ function PinEditor({
                 type="button"
                 onClick={() => {
                   moveTo({ lat: r.lat, lng: r.lng });
+                  addressAbort.current?.abort();
+                  addressTyped.current = false;
                   setAddress(r.label);
                   setSource(null);
                   setShowTip(false);
@@ -573,7 +594,10 @@ function PinEditor({
           id="address"
           className="field"
           value={address}
-          onChange={(e) => setAddress(e.target.value)}
+          onChange={(e) => {
+            addressTyped.current = true;
+            setAddress(e.target.value);
+          }}
           maxLength={ADDRESS_MAX_LENGTH}
           autoComplete="street-address"
           placeholder="e.g. 5, Temidire Street, Mafoluku, Oshodi, Lagos"

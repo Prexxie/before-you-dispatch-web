@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import { FormEvent, useMemo, useState, useSyncExternalStore } from "react";
+import { FormEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   SignUpInput,
   ValidationError,
   VendorCategory,
   categoryLabel,
+  checkEmail,
   googleSignIn,
   googleSignUp,
   signUp,
@@ -30,6 +31,13 @@ type AccountFields = Omit<SignUpInput, "businessAddress" | "businessPhone" | "lo
   categoryOther: string;
 };
 type Field = keyof AccountFields;
+
+// Shown under the email field when the address already has an account.
+function takenMessage(code: string | undefined): string {
+  return code === "google_account"
+    ? "This email is already registered with Google. Continue with Google instead."
+    : "This email is already registered. Log in instead.";
+}
 
 const EMPTY_ACCOUNT: AccountFields = {
   businessName: "",
@@ -143,8 +151,44 @@ function AccountStep({
   onNext: (account: AccountFields) => void;
 }) {
   const [form, setForm] = useState(initial);
-  const [error, setError] = useState<string | null>(initialError);
+  // An "already registered" bounce from the next step shows under the email
+  // field instead (see `taken` below), not as a second message.
+  const [error, setError] = useState<string | null>(
+    initialError && /already/i.test(initialError) ? null : initialError,
+  );
   const [googleBusy, setGoogleBusy] = useState(false);
+  // The last email the API said already has an account, and why. It only
+  // applies while the field still holds that address.
+  const [taken, setTaken] = useState<{ email: string; code?: string } | null>(
+    initialError && /already/i.test(initialError)
+      ? { email: initial.email.trim().toLowerCase() }
+      : null,
+  );
+  const [checking, setChecking] = useState(false);
+  const lastChecked = useRef<string | null>(null);
+
+  // Ask the API whether the email is registered. A failed check (offline,
+  // server down) says nothing: the final sign-up still refuses duplicates.
+  async function verifyEmail(): Promise<boolean> {
+    const email = form.email.trim().toLowerCase();
+    if (!isValidEmail(email)) return true;
+    if (taken?.email === email) return false;
+    if (lastChecked.current === email) return true;
+    setChecking(true);
+    try {
+      const result = await checkEmail(email);
+      lastChecked.current = email;
+      if (result.taken) {
+        setTaken({ email, code: result.code });
+        return false;
+      }
+    } catch {
+      // carry on
+    } finally {
+      setChecking(false);
+    }
+    return true;
+  }
 
   function update(field: Field, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -163,13 +207,18 @@ function AccountStep({
   }
   if (!form.email.trim()) errors.email = "Enter your email address.";
   else if (!isValidEmail(form.email)) errors.email = EMAIL_ERROR;
+  else if (taken && taken.email === form.email.trim().toLowerCase()) {
+    errors.email = takenMessage(taken.code);
+  }
   if (!isStrongPassword(form.password)) errors.password = PASSWORD_ERROR;
   const live = useLiveValidation<Field>(errors, form);
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!live.validateAll()) return;
+    // Don't take them to the next page with an email that can't be used.
+    if (!(await verifyEmail())) return;
     onNext(form);
   }
 
@@ -254,7 +303,10 @@ function AccountStep({
           autoComplete="email"
           value={form.email}
           onChange={(e) => update("email", e.target.value)}
-          onBlur={live.onBlur("email")}
+          onBlur={() => {
+            live.onBlur("email")();
+            verifyEmail();
+          }}
           placeholder="you@business.com"
           aria-invalid={!!live.error("email")}
           aria-describedby={live.error("email") ? "email-error" : undefined}
@@ -291,8 +343,8 @@ function AccountStep({
           onBlurOther={live.onBlur("categoryOther")}
         />
 
-        <button type="submit" className="btn btn-primary btn-block">
-          Create Account
+        <button type="submit" disabled={checking} className="btn btn-primary btn-block">
+          {checking ? "Checking…" : "Create Account"}
         </button>
         {error && (
           <p className="mt-3 text-sm font-semibold text-danger" role="alert">

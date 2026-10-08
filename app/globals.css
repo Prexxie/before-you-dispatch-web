@@ -1257,6 +1257,8 @@ body {
   }
   .attempt-when {
     margin-left: auto;
+    /* "Mon 6 Oct, 2:14 pm" stays on one line; the reason text wraps instead. */
+    white-space: nowrap;
     font-size: 12.5px;
     color: var(--ink-faint);
     font-weight: 600;

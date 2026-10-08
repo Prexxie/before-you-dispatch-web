@@ -19,7 +19,7 @@ import {
 } from "@/lib/api";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { useLiveData } from "@/lib/useLiveData";
-import { formatTime } from "@/lib/time";
+import { formatDayTime, formatTime } from "@/lib/time";
 import {
   customerLink,
   customerMessage,
@@ -175,6 +175,7 @@ function OrderScreen({
             </li>
           </ul>
           <NextAttemptPanel kind="retrigger" order={order} onChange={onChange} />
+          <AttemptHistory order={order} />
           <BackToDashboard />
         </div>
       </>
@@ -195,6 +196,7 @@ function OrderScreen({
             <span className="badge badge-success">Ready</span>
             <span className="badge badge-warning">Pin not shared yet</span>
           </div>
+          <AttemptHistory order={order} />
           <BackToDashboard />
         </div>
         <ResendLinks order={order} sender={sender} />
@@ -213,6 +215,7 @@ function OrderScreen({
           attached.
         </p>
         <RiderLinkCard order={order} sender={sender} onChange={onChange} />
+        <AttemptHistory order={order} />
       </>
     );
   }
@@ -230,6 +233,7 @@ function OrderScreen({
         </p>
         <OnItsWayCard order={order} onChange={onChange} />
         <ResendLinks order={order} sender={sender} />
+        <AttemptHistory order={order} />
       </>
     );
   }
@@ -341,10 +345,12 @@ function LinkActions({
 }) {
   const size = compact ? " !min-h-10 !px-3.5 !text-[13.5px]" : "";
   const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle");
+  // Copying counts as sending: the vendor is about to paste it to them.
   async function copy() {
     try {
       await navigator.clipboard.writeText(link);
       setCopied("copied");
+      onSend?.();
     } catch {
       setCopied("failed");
     }
@@ -671,6 +677,8 @@ function RiderLinkCard({
 
   // Decided 28 Sep: sending the rider link marks the order Dispatched. The
   // link opens WhatsApp in a new tab while this records the dispatch.
+  // Copying it (the button, or selecting it by hand) counts as sending too,
+  // so a rider who gets a pasted link doesn't see "Not sent out yet".
   function send() {
     setError(null);
     dispatchOrder(order.id)
@@ -685,7 +693,7 @@ function RiderLinkCard({
   }
 
   return (
-    <div className="card">
+    <div className="card" onCopy={send}>
       <LinkBox
         link={link}
         label={
@@ -708,8 +716,9 @@ function RiderLinkCard({
         whatsappLabel="Send to Rider via WhatsApp"
       />
       <p className="mt-3.5 text-[13px] leading-normal text-ink-soft">
-        Sending the link marks this order{" "}
-        <strong className="text-ink">Dispatched</strong> on your dashboard.
+        Sending or copying the link, or the rider opening it, marks this
+        order <strong className="text-ink">Dispatched</strong> on your
+        dashboard.
       </p>
       <RiderRow
         order={order}
@@ -846,6 +855,16 @@ function OnItsWayCard({
   return (
     <div className="card">
       <Progress order={order} />
+      {/* Sent to the wrong rider, or they can't go after all: swappable until
+          they collect the order. The order goes back to Confirmed with a new
+          link for the new rider. */}
+      {!order.pickedUpAt && (
+        <RiderRow
+          order={order}
+          note={`Sent it to the wrong rider, or ${rider} can't go? Change them before they pick up. ${rider}'s link stops working, and you'll send the new rider a fresh link.`}
+          onChange={onChange}
+        />
+      )}
       <div className="override">
         <p>
           <strong className="text-ink">{customer} can&apos;t confirm?</strong>{" "}
@@ -878,10 +897,10 @@ function OnItsWayCard({
   );
 }
 
-// Earlier failed attempts of this order (kept when it was redelivered).
-// Failed attempts of this order, oldest first. Earlier ones are saved when the
-// vendor redelivers; the attempt that just failed is still on the order
-// itself, so it's added at the end while the order is in the failed state.
+// Failed attempts of this order, oldest first, shown on every status screen
+// so the history stays visible through the next attempt. Earlier ones are
+// saved when the vendor redelivers; the attempt that just failed is still on
+// the order itself, so it's added at the end while the order is failed.
 function AttemptHistory({ order }: { order: VendorOrder }) {
   const rows = order.attempts.map((a) => ({
     attemptNumber: a.attemptNumber,
@@ -912,7 +931,9 @@ function AttemptHistory({ order }: { order: VendorOrder }) {
               ? ` · ${failureText(a.failureReason, a.failureNote)}`
               : ""}
           </span>
-          <span className="attempt-when">{formatTime(a.failedAt)}</span>
+          {/* Attempts can span days (a redelivery tomorrow), so the day is
+              shown too: "Today, …", "Yesterday, …", then the date. */}
+          <span className="attempt-when">{a.failedAt && formatDayTime(a.failedAt)}</span>
         </div>
       ))}
     </div>

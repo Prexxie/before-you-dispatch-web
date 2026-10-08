@@ -24,6 +24,10 @@ export function useLiveData<T>(
   // Latest callbacks without restarting the loop on every render.
   const loadRef = useRef(load);
   const doneRef = useRef(done);
+  // Bumped by the setter below, so a refresh that was already in flight when
+  // the page saved a change (a new rider, a dispatch) can't land afterwards
+  // and put the old data back.
+  const versionRef = useRef(0);
   useEffect(() => {
     loadRef.current = load;
     doneRef.current = done;
@@ -36,9 +40,14 @@ export function useLiveData<T>(
 
     async function run() {
       clearTimeout(timer);
+      const version = versionRef.current;
       try {
         const data = await loadRef.current();
         if (stopped) return;
+        if (version !== versionRef.current) {
+          timer = setTimeout(tick, REFRESH_MS);
+          return;
+        }
         setState({ kind: "ready", data });
         if (doneRef.current(data)) {
           finished = true;
@@ -73,5 +82,11 @@ export function useLiveData<T>(
     };
   }, [key]);
 
-  return [state, (data: T) => setState({ kind: "ready", data })];
+  return [
+    state,
+    (data: T) => {
+      versionRef.current += 1;
+      setState({ kind: "ready", data });
+    },
+  ];
 }

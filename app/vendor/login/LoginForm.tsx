@@ -24,6 +24,9 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Set once the password was accepted: only then does the full-screen
+  // welcome loader cover the form. A failed login just shows its error.
+  const [signedIn, setSignedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The API's own "bad email" answer, if it gets that far.
   const [emailInvalid, setEmailInvalid] = useState(false);
@@ -52,6 +55,7 @@ export default function LoginForm() {
     setSubmitting(true);
     try {
       await logIn(email.trim(), password);
+      setSignedIn(true);
       // window.location, not router.push: a full navigation so the
       // just-set session cookie is there for the proxy's next check and
       // every page below reloads with a fresh, authenticated fetch.
@@ -105,10 +109,10 @@ export default function LoginForm() {
         Log in to your workspace
       </p>
 
-      {/* One loader from the moment they log in (or the Google popup closes)
-          until the dashboard has loaded: the dashboard shows the same one
-          while ?welcome=1 is on its address. */}
-      {(submitting || googleBusy) && <LogoLoader page cover title={WELCOME_TITLE} label={WELCOME_LOADING} />}
+      {/* One loader from the moment the login succeeds (or the Google popup
+          closes) until the dashboard has loaded: the dashboard shows the same
+          one while ?welcome=1 is on its address. */}
+      {(signedIn || googleBusy) && <LogoLoader page cover title={WELCOME_TITLE} label={WELCOME_LOADING} />}
       <form
         onSubmit={submit}
         noValidate
