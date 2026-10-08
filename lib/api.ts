@@ -198,6 +198,9 @@ export type RiderJob = {
   // Set once the customer confirms receipt; completing needs it.
   receivedAt: string | null;
   deliveryConfirmedBy: DeliveryConfirmer | null;
+  // The vendor opened their own rider link while signed in. A rider opening
+  // a confirmed order's link marks it dispatched; the vendor's preview doesn't.
+  vendorPreview: boolean;
 };
 
 // A 409 from the API: the order is in a state that doesn't allow this.

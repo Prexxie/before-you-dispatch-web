@@ -107,8 +107,9 @@ export default function RiderFlow({ token }: { token: string }) {
         <p className="eyebrow">Order #{job.orderNumber}</p>
         <h1 className="h1">Not sent out yet</h1>
         <p className="sub">
-          {job.vendor?.name ?? "The business"} hasn&apos;t sent this delivery
-          out yet. This page will update by itself once they do.
+          {job.vendorPreview
+            ? "You're signed in as the business, so this is a preview: opening it here doesn't count as sending it. When the rider opens this link, the order is marked Dispatched."
+            : `${job.vendor?.name ?? "The business"} hasn't sent this delivery out yet. This page will update by itself once they do.`}
         </p>
       </PhoneScreen>
     );
