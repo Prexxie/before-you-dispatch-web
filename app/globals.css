@@ -533,6 +533,15 @@ body {
   .btn-block {
     width: 100%;
   }
+  /* The quieter choice next to a primary one (Rider: "Decline Delivery") */
+  .btn-quiet {
+    background: #ffffff;
+    color: var(--ink-soft);
+    border: 1.5px solid var(--border);
+  }
+  .btn-quiet:hover:not(:disabled) {
+    background: #f6f5f1;
+  }
 
   /* Status */
   .badge {
@@ -900,6 +909,28 @@ body {
     background: var(--danger-tint);
     color: var(--danger);
     border: 1.5px solid #fca5a5;
+  }
+
+  /* Vendor: Rider Declined */
+  .decline-alert {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: var(--danger-tint);
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    margin-bottom: 24px;
+  }
+  .decline-alert svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .decline-alert strong {
+    color: #7f1d1d;
   }
 
   /* Which business a delivery is from (Customer: Confirm Ready) */
@@ -1405,10 +1436,120 @@ body {
     margin-bottom: 28px;
   }
   .stat-tile {
+    --tone: var(--brand);
+    --tone-tint: #d1fae5;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
     background: #ffffff;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 20px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    /* It's a button (tap to list those orders): undo the button look. */
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .stat-tile:focus-visible {
+    outline: 2px solid var(--tone);
+    outline-offset: 2px;
+  }
+  /* The tile whose orders are listed below. */
+  .stat-tile.selected {
+    border-color: var(--tone);
+    box-shadow: 0 0 0 1px var(--tone), 0 12px 24px -16px color-mix(in srgb, var(--tone) 60%, transparent);
+  }
+  /* A faint glow of the tile's colour behind its icon. */
+  .stat-tile::before {
+    content: "";
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--tone-tint) 0%, transparent 70%);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .stat-tile > * {
+    position: relative;
+  }
+  .stat-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px -16px rgba(28, 25, 23, 0.35);
+  }
+  /* Same colours as the status filter chips and badges. Orders today is
+     pink: the one hue clear of amber, blue and green (violet read as blue,
+     slate as dull). */
+  .stat-tile.tone-orders { --tone: #db2777; --tone-tint: #fce7f3; }
+  .stat-tile.tone-waiting { --tone: #b45309; --tone-tint: #fef3c7; }
+  .stat-tile.tone-out { --tone: #1d4ed8; --tone-tint: #dbeafe; }
+  .stat-tile.tone-done { --tone: #15803d; --tone-tint: #dcfce7; }
+  .stat-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tone);
+    background: linear-gradient(135deg, var(--tone-tint) 0%, #ffffff 140%);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--tone) 18%, transparent),
+      0 6px 14px -8px color-mix(in srgb, var(--tone) 55%, transparent);
+  }
+  .stat-icon svg {
+    display: block;
+  }
+  /* Something on the road: the bike bobs. */
+  .stat-tile.tone-out.live .stat-icon svg {
+    animation: stat-bob 1.2s ease-in-out infinite;
+  }
+  /* Customers still to answer: a drop of sand keeps falling. */
+  .stat-icon .drop {
+    opacity: 0;
+  }
+  .stat-tile.tone-waiting.live .stat-icon .drop {
+    animation: stat-sand 1.6s ease-in infinite;
+  }
+  /* Orders today: the parcel's sparkle twinkles. */
+  .stat-icon .sparkle {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .stat-tile.tone-orders.live .stat-icon .sparkle {
+    animation: stat-twinkle 2.4s ease-in-out infinite;
+  }
+  @keyframes stat-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+  }
+  @keyframes stat-sand {
+    0% { opacity: 0; transform: translateY(-2.2px); }
+    25% { opacity: 1; }
+    80% { opacity: 1; transform: translateY(1.4px); }
+    100% { opacity: 0; transform: translateY(1.6px); }
+  }
+  @keyframes stat-twinkle {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(0.4) rotate(45deg); opacity: 0.5; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stat-tile,
+    .stat-tile .stat-icon svg,
+    .stat-tile .stat-icon .drop,
+    .stat-tile .stat-icon .sparkle {
+      transition: none;
+      animation: none !important;
+    }
   }
   .stat-num {
     font-size: 26px;
@@ -1426,6 +1567,108 @@ body {
     font-size: 12.5px;
     color: var(--ink-faint);
     font-weight: 600;
+  }
+  /* "Needs your attention" (design: "Vendor: Dashboard"): today's orders waiting
+     on the vendor, above the stat tiles. */
+  .needs {
+    background: #ffffff;
+    border: 1px solid #f3d9a4;
+    border-radius: var(--radius);
+    padding: 18px 22px 8px 22px;
+    margin-bottom: 22px;
+    box-shadow: 0 10px 24px -18px rgba(180, 83, 9, 0.45);
+  }
+  .needs-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .needs-head h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0;
+    font-family: inherit;
+  }
+  .needs-count {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: #b45309;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .needs-sub {
+    margin-left: auto;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+  .needs-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid #f1efea;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .needs-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .needs-row strong {
+    color: var(--ink);
+  }
+  .needs-when {
+    margin-left: auto;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .needs-btn {
+    min-height: 36px;
+    min-width: 156px;
+    padding: 0 14px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .needs-more {
+    margin: 0;
+    padding: 10px 0 12px 0;
+    border-top: 1px solid #f1efea;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+  /* "Recent orders", or "Today's orders · …" with a way back after a tile. */
+  .orders-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-bottom: 16px;
+    scroll-margin-top: 80px;
+  }
+  .orders-clear {
+    border: 0;
+    background: none;
+    padding: 0;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--brand);
+    text-decoration: underline;
+    cursor: pointer;
   }
   /* Dashboard status filter */
   .filter-row {
@@ -1638,6 +1881,36 @@ body {
     }
     .stat-row {
       grid-template-columns: repeat(2, 1fr);
+    }
+    .stat-tile {
+      padding: 16px;
+    }
+    /* Phones: the message on its own line, then the time and the button. */
+    .needs {
+      padding: 16px 16px 6px 16px;
+    }
+    .needs-row {
+      flex-wrap: wrap;
+      gap: 6px 10px;
+    }
+    .needs-text {
+      flex: 1 1 calc(100% - 24px);
+    }
+    .needs-when {
+      margin-left: 19px;
+    }
+    .needs-btn {
+      margin-left: auto;
+      min-width: 0;
+    }
+    .stat-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+    }
+    .stat-icon svg {
+      width: 15px;
+      height: 15px;
     }
     .split-riders,
     .split-riders[data-open="true"] {
@@ -2187,6 +2460,42 @@ body {
   }
   @keyframes lp-march {
     to { stroke-dashoffset: -64; }
+  }
+  /* A rider driving a dotted route once (RouteRider). The outer span is
+     moved along the path; the inner one sits the wheels on the line. */
+  .lp-route-rider {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    /* Tilt around the point on the line, not the icon's middle. */
+    transform-origin: 0 0;
+  }
+  .lp-route-rider > span {
+    display: block;
+    /* Wheel bottoms are at 91% of the drawing's height. */
+    transform: translate(-50%, -91%);
+  }
+  .lp-route-rider svg {
+    display: block;
+  }
+  /* Hero: soft grey, so it stays behind the copy. */
+  .lp-route-rider.hero {
+    color: var(--ink-faint);
+  }
+  .lp-route-rider.hero.riding {
+    opacity: 0.6;
+  }
+  /* Closing banner: white on the green, as faint as its route. The visor is
+     white too, so it reads as part of the helmet there. */
+  .lp-route-rider.cta {
+    color: #ffffff;
+  }
+  .lp-route-rider.cta.riding {
+    opacity: 0.55;
   }
 
   /* Hero copy rises in on load, one piece after another. */
@@ -2919,6 +3228,7 @@ body {
 .lp-cta-btn { display: inline-flex; margin-top: 26px; min-height: 52px; padding: 0 28px; font-size: 15px; }
 .lp-cta-band > .lp-cta-route { position: absolute; right: 56px; top: 50%; width: 460px; height: auto; transform: translateY(-50%); opacity: 0.38; z-index: 0; }
 .lp-cta-route path[stroke-dasharray] { animation: lp-march 3s linear infinite; }
+.lp-cta-band > .lp-route-rider { position: absolute; z-index: 0; }
 
 @media (max-width: 900px) {
   .lp-bento { grid-template-columns: 1fr; }
@@ -2930,7 +3240,7 @@ body {
   .lp-diff-vs { justify-self: center; }
   .lp-trip { padding: 24px 22px 8px 22px; }
   .lp-cta-band { padding: 40px 24px; }
-  .lp-cta-band > .lp-cta-route { display: none; }
+  .lp-cta-band > .lp-cta-route, .lp-cta-band > .lp-route-rider { display: none; }
   .lp-cta-band h3 { font-size: 26px; }
 }
 @media (prefers-reduced-motion: reduce) {

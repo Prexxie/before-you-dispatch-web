@@ -9,7 +9,9 @@ import {
   FAILURE_REASON_LABELS,
   FailureReason,
   RiderJob,
+  acceptJob,
   confirmArrived,
+  declineJob,
   confirmPickup,
   undoArrived,
   undoPickup,
@@ -66,6 +68,11 @@ export default function RiderFlow({ token }: { token: string }) {
   // unlock by themselves as the rider and customer act.
   const [view, setJob] = useLiveData(() => getRiderJob(token), token, finished);
   const [failing, setFailing] = useState(false);
+  // Set after "Decline Delivery": the link stops working at once, so this
+  // screen stays put instead of the next refresh showing "isn't valid".
+  const [declined, setDeclined] = useState<RiderJob | null>(null);
+
+  if (declined) return <DeclinedScreen job={declined} />;
 
   if (view.kind === "loading") {
     return (
@@ -100,6 +107,23 @@ export default function RiderFlow({ token }: { token: string }) {
   const job = view.data;
   if (finished(job)) return <DoneScreen job={job} />;
 
+  // Nothing to do until the rider says yes or no. A still-"confirmed" order
+  // means the vendor pasted the link without the send buttons; accepting it
+  // marks it dispatched.
+  if (
+    (job.status === "confirmed" || job.status === "dispatched") &&
+    !job.acceptedAt &&
+    !job.pickedUpAt
+  ) {
+    return (
+      <AcceptScreen
+        token={token}
+        job={job}
+        onChange={setJob}
+        onDeclined={() => setDeclined(job)}
+      />
+    );
+  }
   if (job.status !== "dispatched") {
     return (
       <PhoneScreen centered>
@@ -107,9 +131,8 @@ export default function RiderFlow({ token }: { token: string }) {
         <p className="eyebrow">Order #{job.orderNumber}</p>
         <h1 className="h1">Not sent out yet</h1>
         <p className="sub">
-          {job.vendorPreview
-            ? "You're signed in as the business, so this is a preview: opening it here doesn't count as sending it. When the rider opens this link, the order is marked Dispatched."
-            : `${job.vendor?.name ?? "The business"} hasn't sent this delivery out yet. This page will update by itself once they do.`}
+          {job.vendor?.name ?? "The business"} hasn&apos;t sent this delivery
+          out yet. This page will update by itself once they do.
         </p>
       </PhoneScreen>
     );
@@ -138,6 +161,207 @@ export default function RiderFlow({ token }: { token: string }) {
       onChange={setJob}
       onCouldntDeliver={() => setFailing(true)}
     />
+  );
+}
+
+// Design: "Rider: Accept or Decline". Same pickup leg as the next screen,
+// but the rider answers first. "Decline Delivery" asks once more (design:
+// "Rider: Decline (confirm)") since it closes the link.
+function AcceptScreen({
+  token,
+  job,
+  onChange,
+  onDeclined,
+}: {
+  token: string;
+  job: RiderJob;
+  onChange: (job: RiderJob) => void;
+  onDeclined: () => void;
+}) {
+  const vendor = job.vendor?.name ?? "The business";
+  const [confirmingDecline, setConfirmingDecline] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+    } catch (err) {
+      setError(
+        err instanceof ConflictError
+          ? err.message
+          : "That didn't go through. Check your connection and try again.",
+      );
+      setBusy(false);
+    }
+  }
+
+  const accept = () =>
+    run(async () => {
+      const result = await acceptJob(token);
+      onChange({ ...job, ...result });
+    });
+  const decline = () =>
+    run(async () => {
+      await declineJob(token);
+      onDeclined();
+    });
+
+  const errorLine = error && (
+    <p className="mt-3 text-sm font-semibold text-danger" role="alert">
+      {error}
+    </p>
+  );
+
+  if (confirmingDecline) {
+    return (
+      <PhoneScreen>
+        <p className="eyebrow">Order #{job.orderNumber}</p>
+        <h1 className="h1">Decline this delivery?</h1>
+        <p className="sub">
+          We&apos;ll let {vendor} know right away so they can send another
+          rider. This link will stop working for you.
+        </p>
+        <div className="summary">
+          <div className="summary-row">
+            <span className="summary-label">Deliver to</span>
+            <span className="summary-val">{job.customerName}</span>
+          </div>
+          <div className="summary-row">
+            <span className="summary-label">Items</span>
+            <span className="summary-val">{asSentenceStart(job.itemDescription)}</span>
+          </div>
+          {job.vendor && (
+            <div className="summary-row">
+              <span className="summary-label">From</span>
+              <span className="summary-val">{job.vendor.name}</span>
+            </div>
+          )}
+        </div>
+        <button
+          className="outcome-btn outcome-failed justify-center"
+          onClick={decline}
+          disabled={busy}
+        >
+          <CrossIcon />
+          {busy ? "Declining…" : "Yes, Decline"}
+        </button>
+        <button
+          className="btn btn-secondary btn-block"
+          onClick={() => {
+            setConfirmingDecline(false);
+            setError(null);
+          }}
+          disabled={busy}
+        >
+          Go Back
+        </button>
+        {errorLine}
+        {job.vendor?.phone && (
+          <p className="mt-4 text-[13px] leading-normal text-ink-soft">
+            Want to talk it through first? Call {vendor} on{" "}
+            <a className="font-bold text-brand" href={telLink(job.vendor.phone)}>
+              {displayPhone(job.vendor.phone)}
+            </a>
+            .
+          </p>
+        )}
+      </PhoneScreen>
+    );
+  }
+
+  return (
+    <PhoneScreen>
+      <p className="eyebrow">New Job &middot; Order #{job.orderNumber}</p>
+      <h1 className="h1">Can you take this delivery?</h1>
+      <p className="sub">
+        {vendor} wants this delivered today. Accept to get directions to the
+        pickup point, or let them know you can&apos;t.
+      </p>
+      <PickupLeg job={job} />
+      <button onClick={accept} disabled={busy} className="btn btn-primary btn-block mb-3">
+        <CheckIcon size={16} />
+        {busy ? "Accepting…" : "Accept Delivery"}
+      </button>
+      <button
+        onClick={() => {
+          setConfirmingDecline(true);
+          setError(null);
+        }}
+        disabled={busy}
+        className="btn btn-quiet btn-block"
+      >
+        Decline Delivery
+      </button>
+      {errorLine}
+    </PhoneScreen>
+  );
+}
+
+// Design: "Rider: Declined (business told)".
+function DeclinedScreen({ job }: { job: RiderJob }) {
+  const vendor = job.vendor?.name ?? "The business";
+  return (
+    <ResultScreen
+      icon={<CheckIcon />}
+      tone="neutral"
+      eyebrow={`Order #${job.orderNumber}`}
+      title="Thanks for letting them know"
+      sub={`${vendor} has been told you declined this delivery, so they can send someone else. You can close this page.`}
+    >
+      {job.vendor?.phone && (
+        <p className="text-[13px] leading-normal text-ink-soft">
+          Changed your mind? Call {vendor} on{" "}
+          <a className="font-bold text-brand" href={telLink(job.vendor.phone)}>
+            {displayPhone(job.vendor.phone)}
+          </a>
+          . They can send you a new link.
+        </p>
+      )}
+    </ResultScreen>
+  );
+}
+
+// The pickup point, the items and who it's for (no pin yet). Shared by the
+// accept and pickup screens.
+function PickupLeg({ job }: { job: RiderJob }) {
+  return (
+    <div className="card" style={{ marginBottom: 18, padding: 24 }}>
+      {job.vendor && (
+        <>
+          <div className="leg">
+            <span
+              className="avatar"
+              style={{ width: 36, height: 36, fontSize: 13, background: "#FDF2F4", color: "#9F1239" }}
+            >
+              {initials(job.vendor.name)}
+            </span>
+            <div>
+              <div className="leg-label">Pick up from</div>
+              <div className="leg-name">{job.vendor.name}</div>
+              <div className="leg-meta">
+                <VendorContact vendor={job.vendor} />
+              </div>
+            </div>
+          </div>
+          <div className="leg-divider" />
+        </>
+      )}
+      <p className="field-label">
+        <PackageIcon />
+        Item to collect
+      </p>
+      <div className="text-[14.5px] text-ink mb-4">{job.itemDescription}</div>
+      <div className="next-leg">
+        <NextStopIcon />
+        <span>
+          Then deliver to <strong>{job.customerName}</strong> &middot; pin
+          shown after pickup
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -182,40 +406,7 @@ function PickupScreen({
         pickup to unlock the customer&apos;s pin.
       </p>
 
-      <div className="card" style={{ marginBottom: 18, padding: 24 }}>
-        {job.vendor && (
-          <>
-            <div className="leg">
-              <span
-                className="avatar"
-                style={{ width: 36, height: 36, fontSize: 13, background: "#FDF2F4", color: "#9F1239" }}
-              >
-                {initials(job.vendor.name)}
-              </span>
-              <div>
-                <div className="leg-label">Pick up from</div>
-                <div className="leg-name">{job.vendor.name}</div>
-                <div className="leg-meta">
-                  <VendorContact vendor={job.vendor} />
-                </div>
-              </div>
-            </div>
-            <div className="leg-divider" />
-          </>
-        )}
-        <p className="field-label">
-          <PackageIcon />
-          Item to collect
-        </p>
-        <div className="text-[14.5px] text-ink mb-4">{job.itemDescription}</div>
-        <div className="next-leg">
-          <NextStopIcon />
-          <span>
-            Then deliver to <strong>{job.customerName}</strong> &middot; pin
-            shown after pickup
-          </span>
-        </div>
-      </div>
+      <PickupLeg job={job} />
 
       {job.vendor?.address && (
         <a
@@ -380,8 +571,11 @@ function EnRouteScreen({
         {landmarkNote}
       </div>
 
+      {/* Directions go to the address the customer gave, not the pin's
+          coordinates (decided 8 Oct). Only a customer who left the address
+          empty gets directions to the pin. */}
       <a
-        href={directionsLink(lat, lng)}
+        href={address ? directionsLinkToAddress(address) : directionsLink(lat, lng)}
         target="_blank"
         rel="noopener noreferrer"
         className="btn btn-secondary btn-block"
@@ -390,12 +584,11 @@ function EnRouteScreen({
         <DirectionsIcon />
         Get Directions
       </a>
-      {address && (
-        <p className="caption" style={{ marginTop: -6, marginBottom: 14 }}>
-          Directions go to the customer&apos;s pin. Google may label it with the
-          nearest house number, so go by the address above.
-        </p>
-      )}
+      <p className="caption" style={{ marginTop: -6, marginBottom: 14 }}>
+        {address
+          ? `Directions go to ${customer}'s address above.`
+          : `${customer} didn't give an address, so directions go to their pin.`}
+      </p>
 
       {job.arrivedAt ? (
         <>

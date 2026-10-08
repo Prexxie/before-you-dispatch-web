@@ -11,6 +11,7 @@ export function statusBadge(order: {
   status: OrderStatus;
   hasLocation: boolean;
   pickedUpAt: string | null;
+  riderDeclinedAt: string | null;
   arrivedAt: string | null;
   receivedAt: string | null;
   failureReason: FailureReason | null;
@@ -20,6 +21,11 @@ export function statusBadge(order: {
     case "pending_confirmation":
       return { className: "badge-warning", label: "Awaiting confirmation" };
     case "confirmed":
+      // Design: dashboard row "Rider declined – pick another" (red: needs
+      // the vendor to act).
+      if (order.riderDeclinedAt) {
+        return { className: "badge-danger", label: "Rider declined – pick another" };
+      }
       return order.hasLocation
         ? { className: "badge-filled", label: "Confirmed – ready to send" }
         : { className: "badge-filled", label: "Confirmed – waiting for pin" };

@@ -3,7 +3,7 @@ import { ReactNode } from "react";
 import { ThemeColor } from "@/lib/api";
 import { themeStyle } from "@/lib/theme";
 import Breadcrumbs, { Crumb } from "./Breadcrumbs";
-import { LogoMark } from "./icons";
+import { LogoMark, RiderIcon } from "./icons";
 import { ProfileBlock } from "./Profile";
 
 type Section = "dashboard" | "create" | "riders" | "settings";
@@ -130,13 +130,7 @@ function PlusIcon() {
 }
 
 function BikeIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="6" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
-      <circle cx="18" cy="17" r="3" stroke="currentColor" strokeWidth="2" />
-      <path d="M6 17l4-8h4l4 8M10 9h5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <RiderIcon size={16} />;
 }
 
 function GearIcon() {

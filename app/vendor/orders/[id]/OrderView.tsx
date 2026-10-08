@@ -14,6 +14,7 @@ import {
   getRiders,
   getVendorOrder,
   markDeliveredByVendor,
+  OrderAttempt,
   redeliverOrder,
   retriggerOrder,
 } from "@/lib/api";
@@ -31,6 +32,7 @@ import {
   whatsappLink,
 } from "@/lib/links";
 import {
+  AlertIcon,
   BackIcon,
   CheckIcon,
   CrossIcon,
@@ -204,32 +206,54 @@ function OrderScreen({
     );
   }
 
-  // Design: "Vendor: Rider Link Generated"
+  // Design: "Vendor: Rider Link Generated", or "Vendor: Rider Declined (pick
+  // another)" once the rider declined.
   if (order.status === "confirmed") {
     return (
       <>
         {eyebrow}
-        <h1 className="h1">{customer} confirmed, they&apos;re ready</h1>
-        <p className="sub">
-          Send this link to {rider} with the pin and landmark note already
-          attached.
-        </p>
+        {order.riderDeclinedAt ? (
+          <>
+            <h1 className="h1">
+              {firstName(order.declinedRiderName ?? order.rider.name)} declined
+              this delivery
+            </h1>
+            <p className="sub">
+              Pick another rider and send them the new link. {customer}&apos;s
+              pin, landmark note and link stay the same.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="h1">{customer} confirmed, they&apos;re ready</h1>
+            <p className="sub">
+              Send this link to {rider} with the pin and landmark note already
+              attached.
+            </p>
+          </>
+        )}
         <RiderLinkCard order={order} sender={sender} onChange={onChange} />
         <AttemptHistory order={order} />
       </>
     );
   }
 
-  // Design: "Vendor: On Its Way (override)"
+  // Design: "Vendor: On Its Way (override)", or "Vendor: Waiting for Rider
+  // to Accept" until the rider answers.
   if (order.status === "dispatched") {
+    const awaitingAccept = !order.acceptedAt && !order.pickedUpAt;
     return (
       <>
         {eyebrow}
-        <h1 className="h1">On its way to {customer}</h1>
+        <h1 className="h1">
+          {awaitingAccept ? `Waiting for ${rider} to accept` : `On its way to ${customer}`}
+        </h1>
         <p className="sub">
-          {order.pickedUpAt
-            ? `${rider} picked up the order and has the pin and landmark note. ${customer} confirms when the items are in their hands, then ${rider} completes the delivery.`
-            : `Waiting for ${rider} to confirm pickup. Their pin and landmark note unlock automatically once they do.`}
+          {awaitingAccept
+            ? `The link is with ${rider}. Once they accept, they head to you for pickup; ${customer}'s pin unlocks for them after they pick up.`
+            : order.pickedUpAt
+              ? `${rider} picked up the order and has the pin and landmark note. ${customer} confirms when the items are in their hands, then ${rider} completes the delivery.`
+              : `${rider} accepted and is coming to pick up. Their pin and landmark note unlock automatically once they confirm pickup.`}
         </p>
         <OnItsWayCard order={order} onChange={onChange} />
         <ResendLinks order={order} sender={sender} />
@@ -469,12 +493,20 @@ function RiderRow({
   order,
   note,
   onChange,
+  label = "Rider",
+  startOpen = false,
+  bare = false,
 }: {
   order: VendorOrder;
   note: string;
   onChange: (order: VendorOrder) => void;
+  label?: string;
+  // Opens with the rider list showing (the rider declined).
+  startOpen?: boolean;
+  // Without the rule above it, for the top of a card.
+  bare?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(startOpen);
   const [riders, setRiders] = useState<Rider[]>([]);
   const [riderId, setRiderId] = useState(order.rider.id);
   const [busy, setBusy] = useState(false);
@@ -522,11 +554,20 @@ function RiderRow({
     }
   }
 
+  // The rider who declined stays in the list (they might be
+  // able to after all), marked so.
+  const declined = (r: Rider) =>
+    order.riderDeclinedAt && r.id === order.rider.id ? " (declined)" : "";
+
   return (
-    <div className="mb-[18px] mt-1 border-t border-[#F1EFEA] pt-[18px]">
+    <div
+      className={
+        bare ? "mb-[26px]" : "mb-[18px] mt-1 border-t border-[#F1EFEA] pt-[18px]"
+      }
+    >
       <label className="field-label" htmlFor="change-rider">
         <RiderIcon />
-        Rider
+        {label}
       </label>
       {editing ? (
         <>
@@ -542,6 +583,7 @@ function RiderRow({
               <option key={r.id} value={r.id}>
                 {r.name}
                 {vehicle(r.vehicle)}
+                {declined(r)}
               </option>
             ))}
           </select>
@@ -692,22 +734,50 @@ function RiderLinkCard({
       );
   }
 
+  // Design: "Vendor: Rider Declined (pick another)".
+  const declinedBy = order.riderDeclinedAt
+    ? firstName(order.declinedRiderName ?? order.rider.name)
+    : null;
+
   return (
-    <div className="card" onCopy={send}>
-      <LinkBox
-        link={link}
-        label={
-          <>
-            <RiderIcon />
-            Rider delivery link
-          </>
-        }
-      />
-      <div className="row-flex" style={{ marginBottom: 22 }}>
-        <span className="badge badge-success">Pin dropped</span>
-        <span className="badge badge-success">Note added</span>
+    <div className="card">
+      {declinedBy && (
+        <>
+          <div className="decline-alert" role="alert">
+            <AlertIcon size={18} />
+            <span>
+              <strong>{declinedBy} declined</strong> at{" "}
+              {formatTime(order.riderDeclinedAt)}. Their link has stopped
+              working.
+            </span>
+          </div>
+          <RiderRow
+            order={order}
+            label="Pick another rider"
+            startOpen
+            bare
+            note={`The new rider gets their own link. ${declinedBy} can go after all? Keep ${declinedBy} and send them the link below again.`}
+            onChange={onChange}
+          />
+        </>
+      )}
+      {/* Copying the link by hand counts as sending it, like the buttons. */}
+      <div onCopy={send}>
+        <LinkBox
+          link={link}
+          label={
+            <>
+              <RiderIcon />
+              Rider delivery link
+            </>
+          }
+        />
+        <div className="row-flex" style={{ marginBottom: 22 }}>
+          <span className="badge badge-success">Pin dropped</span>
+          <span className="badge badge-success">Note added</span>
+        </div>
+        <MessagePreview to={firstName(order.rider.name)} message={message} />
       </div>
-      <MessagePreview to={firstName(order.rider.name)} message={message} />
       <LinkActions
         link={link}
         phone={order.rider.phone}
@@ -716,15 +786,17 @@ function RiderLinkCard({
         whatsappLabel="Send to Rider via WhatsApp"
       />
       <p className="mt-3.5 text-[13px] leading-normal text-ink-soft">
-        Sending or copying the link, or the rider opening it, marks this
-        order <strong className="text-ink">Dispatched</strong> on your
-        dashboard.
+        Sending or copying the link marks this order{" "}
+        <strong className="text-ink">Dispatched</strong> on your dashboard.{" "}
+        {firstName(order.rider.name)} then accepts or declines it.
       </p>
-      <RiderRow
-        order={order}
-        note="Rider can't take it? Change them before you send. This creates a new link for the new rider and the old one stops working."
-        onChange={onChange}
-      />
+      {!declinedBy && (
+        <RiderRow
+          order={order}
+          note="Rider can't go? Change them before you send. This creates a new link for the new rider and the old one stops working."
+          onChange={onChange}
+        />
+      )}
       {error && (
         <p className="mt-3 text-sm font-semibold text-danger" role="alert">
           {error}
@@ -748,12 +820,25 @@ function Progress({ order }: { order: VendorOrder }) {
     },
     { label: `Rider link sent to ${rider}`, state: "done", at: formatTime(order.dispatchedAt) },
     {
+      label: order.acceptedAt ? `${rider} accepted` : `Waiting for ${rider} to accept`,
+      state: order.acceptedAt
+        ? "done"
+        : finished || order.pickedUpAt || order.receivedAt
+          ? "todo"
+          : "current",
+      at: formatTime(order.acceptedAt),
+    },
+    {
       label: order.pickedUpAt
         ? `${rider} picked up the order`
         : `${rider} confirms pickup`,
       // A finished order whose rider never tapped pickup (a failed attempt,
       // or a vendor override) shows this as skipped, not "in progress".
-      state: order.pickedUpAt ? "done" : finished || order.receivedAt ? "todo" : "current",
+      state: order.pickedUpAt
+        ? "done"
+        : finished || order.receivedAt || !order.acceptedAt
+          ? "todo"
+          : "current",
       at: formatTime(order.pickedUpAt),
     },
     {
@@ -854,17 +939,9 @@ function OnItsWayCard({
 
   return (
     <div className="card">
+      {/* No "Change rider" once the link is sent: a rider who can't go taps
+          "Decline Delivery", which hands the order back for another rider. */}
       <Progress order={order} />
-      {/* Sent to the wrong rider, or they can't go after all: swappable until
-          they collect the order. The order goes back to Confirmed with a new
-          link for the new rider. */}
-      {!order.pickedUpAt && (
-        <RiderRow
-          order={order}
-          note={`Sent it to the wrong rider, or ${rider} can't go? Change them before they pick up. ${rider}'s link stops working, and you'll send the new rider a fresh link.`}
-          onChange={onChange}
-        />
-      )}
       <div className="override">
         <p>
           <strong className="text-ink">{customer} can&apos;t confirm?</strong>{" "}
@@ -897,20 +974,20 @@ function OnItsWayCard({
   );
 }
 
-// Failed attempts of this order, oldest first, shown on every status screen
-// so the history stays visible through the next attempt. Earlier ones are
-// saved when the vendor redelivers; the attempt that just failed is still on
-// the order itself, so it's added at the end while the order is failed.
+// Earlier rounds of this order, oldest first, shown on every status screen
+// so the history stays visible through the next attempt: failed deliveries
+// (saved when the vendor redelivers) and the customer's "Not now" (saved
+// when the vendor retriggers). The round that just ended is still on the
+// order itself, so it's added at the end while the order is failed or
+// declined. Design: "Vendor: Failed (Redeliver)" / "Vendor: Declined".
 function AttemptHistory({ order }: { order: VendorOrder }) {
-  const rows = order.attempts.map((a) => ({
-    attemptNumber: a.attemptNumber,
-    riderName: a.riderName,
-    failureReason: a.failureReason,
-    failureNote: a.failureNote,
-    failedAt: a.failedAt,
-  }));
+  const rows: Pick<
+    OrderAttempt,
+    "outcome" | "attemptNumber" | "riderName" | "failureReason" | "failureNote" | "failedAt"
+  >[] = [...order.attempts];
   if (order.status === "failed") {
     rows.push({
+      outcome: "failed",
       attemptNumber: order.attempt,
       riderName: order.rider.name,
       failureReason: order.failureReason,
@@ -918,19 +995,41 @@ function AttemptHistory({ order }: { order: VendorOrder }) {
       failedAt: order.completedAt,
     });
   }
+  if (order.status === "not_ready") {
+    rows.push({
+      outcome: "declined",
+      attemptNumber: order.attempt,
+      riderName: order.rider.name,
+      failureReason: null,
+      failureNote: null,
+      failedAt: order.notReadyAt,
+    });
+  }
   if (rows.length === 0) return null;
+  const customer = firstName(order.customerName);
   return (
     <div className="mt-6">
       <p className="field-label">Attempt history</p>
-      {rows.map((a) => (
-        <div key={a.attemptNumber} className="attempt">
-          <span className="badge badge-danger">Failed</span>
-          <span>
-            <strong>Attempt {a.attemptNumber}</strong> · {firstName(a.riderName)}
-            {a.failureReason
-              ? ` · ${failureText(a.failureReason, a.failureNote)}`
-              : ""}
-          </span>
+      {rows.map((a, i) => (
+        <div key={i} className="attempt">
+          {a.outcome === "declined" ? (
+            <>
+              <span className="badge badge-neutral">Declined</span>
+              <span>
+                <strong>{customer} said Not now</strong> · link closed
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="badge badge-danger">Failed</span>
+              <span>
+                <strong>Attempt {a.attemptNumber}</strong> · {firstName(a.riderName)}
+                {a.failureReason
+                  ? ` · ${failureText(a.failureReason, a.failureNote)}`
+                  : ""}
+              </span>
+            </>
+          )}
           {/* Attempts can span days (a redelivery tomorrow), so the day is
               shown too: "Today, …", "Yesterday, …", then the date. */}
           <span className="attempt-when">{a.failedAt && formatDayTime(a.failedAt)}</span>

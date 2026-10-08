@@ -35,12 +35,14 @@ export function smsLink(phone: string, message: string): string {
   return `sms:${phone.replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(message)}`;
 }
 
-// Opens Google Maps (app or web) with directions to the customer's pin.
+// Opens Google Maps (app or web) with directions to a pin. Only used for a
+// customer who left their address empty.
 export function directionsLink(lat: number, lng: number): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 }
 
-// Same, but to a text address (the vendor's pickup point has no pin).
+// Same, but to a text address: the customer's address as they gave it, and
+// the vendor's pickup point.
 export function directionsLinkToAddress(address: string): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
 }
