@@ -1,9 +1,13 @@
 "use client";
 
 import { CSSProperties, useState } from "react";
+import { createPortal } from "react-dom";
 import { logOut } from "@/lib/api";
 import { LOGOUT_LOADING, LOGOUT_TITLE } from "@/lib/brand";
 import LogoLoader from "./LogoLoader";
+
+// How long the logout loader stays up at least.
+const MIN_LOADER_MS = 1200;
 
 export default function LogoutButton({
   className,
@@ -18,7 +22,9 @@ export default function LogoutButton({
 
   async function handleClick() {
     setLoggingOut(true);
-    await logOut();
+    // Logging out takes a moment at most, so hold the loader for a beat:
+    // otherwise it flashes up and is gone before it can be seen.
+    await Promise.all([logOut(), new Promise((r) => setTimeout(r, MIN_LOADER_MS))]);
     // Full navigation: clears in-memory state and lets middleware see the
     // now-cleared cookie on the way to the login page.
     window.location.href = "/vendor/login";
@@ -26,9 +32,13 @@ export default function LogoutButton({
 
   return (
     <>
-    {loggingOut && (
-      <LogoLoader page cover title={LOGOUT_TITLE} label={LOGOUT_LOADING} />
-    )}
+    {/* In document.body, not here: the button lives in the sidebar/top bar,
+        whose stacking context would keep the cover from hiding the page. */}
+    {loggingOut &&
+      createPortal(
+        <LogoLoader page cover title={LOGOUT_TITLE} label={LOGOUT_LOADING} />,
+        document.body,
+      )}
     <button
       type="button"
       onClick={handleClick}

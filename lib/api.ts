@@ -737,6 +737,24 @@ export async function signUp(input: SignUpInput): Promise<Vendor> {
   return rememberTheme(await res.json());
 }
 
+export type EmailCheck = { taken: false } | { taken: true; code: "email_taken" | "google_account" };
+
+// Is this email already registered? Asked on the sign-up form before the
+// vendor goes any further. Plain fetch: no session is involved.
+export async function checkEmail(email: string): Promise<EmailCheck> {
+  const res = await fetch(`${API_URL}/auth/check-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (res.status === 400) {
+    const body: { error: string; fields?: string[] } = await res.json();
+    throw new ValidationError(body.error, body.fields ?? []);
+  }
+  if (!res.ok) throw new Error(`POST check-email failed: ${res.status}`);
+  return res.json();
+}
+
 // A bad email is a 400; a wrong password, or an account that only has Google
 // sign-in (code "google_account"), is a 401.
 export async function logIn(email: string, password: string): Promise<Vendor> {

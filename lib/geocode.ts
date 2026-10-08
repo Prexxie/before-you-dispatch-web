@@ -167,3 +167,36 @@ export async function searchPlaces(
   ]);
   if (!signal?.aborted) cache.set(key, merge([a, b]));
 }
+
+// Address for a dropped pin (the reverse of a search), so moving the pin fills
+// the address field without the customer searching. HERE when there's a key,
+// otherwise Photon. Returns null when nothing is found or the service fails.
+export async function addressAt(point: Near, signal?: AbortSignal): Promise<string | null> {
+  try {
+    if (HERE_KEY) {
+      const params = new URLSearchParams({
+        at: `${point.lat},${point.lng}`,
+        limit: "1",
+        lang: "en",
+        // Street addresses, not the nearest shop or hotel.
+        types: "address,street",
+        apiKey: HERE_KEY,
+      });
+      const res = await fetch(`https://revgeocode.search.hereapi.com/v1/revgeocode?${params}`, {
+        signal: withTimeout(signal),
+      });
+      if (!res.ok) return null;
+      const body: { items: { address?: { label?: string } }[] } = await res.json();
+      return body.items[0]?.address?.label ?? null;
+    }
+    const params = new URLSearchParams({ lat: String(point.lat), lon: String(point.lng) });
+    const res = await fetch(`https://photon.komoot.io/reverse?${params}`, {
+      signal: withTimeout(signal),
+    });
+    if (!res.ok) return null;
+    const body: { features: PhotonFeature[] } = await res.json();
+    return body.features[0] ? photonLabel(body.features[0].properties) || null : null;
+  } catch {
+    return null;
+  }
+}
