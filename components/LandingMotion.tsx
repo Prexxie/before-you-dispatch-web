@@ -2,8 +2,10 @@
 
 import { ReactNode, useEffect, useRef } from "react";
 
-// Landing-page motion. Everything here only adds polish: with no JavaScript,
-// or with reduced motion, the page is fully visible and still.
+// Landing-page motion. Everything here only adds polish: with no JavaScript
+// the page is fully visible and still. It does not follow the OS "reduce
+// motion" setting: many Android phones (Redmi, battery saver) report it on by
+// default, which switched the whole landing page off.
 
 // Scroll reveal for the landing page, driven entirely by class names so the
 // markup stays plain. `.lp-reveal` elements start hidden (`pre`) and fade up
@@ -14,7 +16,6 @@ import { ReactNode, useEffect, useRef } from "react";
 export function ScrollReveal() {
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const els = document.querySelectorAll<HTMLElement>(".lp-reveal, .lp-draw");
     // "Visible" means 15% of the element, or 15% of the screen's height for
     // an element taller than that (on a phone the stacked comparison is
@@ -61,12 +62,7 @@ export function CountUp({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (
-      typeof IntersectionObserver === "undefined" ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      return;
-    }
+    if (typeof IntersectionObserver === "undefined") return;
     const show = (n: number) => {
       el.textContent = `${prefix}${Math.round(n)}${suffix}`;
     };
@@ -170,7 +166,6 @@ export function RouteRider({
     const box = el?.parentElement;
     const path = box?.querySelector<SVGPathElement>(route);
     if (!el || !box || !path) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const total = path.getTotalLength();
     const ease = (t: number) => (1 - Math.cos(Math.PI * t)) / 2; // sine in-out: steady pace
