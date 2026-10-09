@@ -185,12 +185,14 @@ export function RouteRider({
       el.style.transform = `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)`;
     };
 
+    // The route is shorter on a phone, so the drive is quicker too.
+    const ride_ms = window.innerWidth <= 900 ? Math.min(duration, 5000) : duration;
     let frame = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let start: number | null = null;
     const step = (now: number) => {
       start ??= now;
-      const t = Math.min(1, (now - start) / duration);
+      const t = Math.min(1, (now - start) / ride_ms);
       place(ease(t) * total);
       if (t < 1) frame = requestAnimationFrame(step);
       else el.classList.remove("riding");

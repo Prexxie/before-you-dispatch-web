@@ -111,7 +111,7 @@ export function ProfileMenu() {
         onClick={() => setOpen((o) => !o)}
       >
         <span className="profile-avatar">{me ? initials(me.ownerName) : ""}</span>
-        {me ? firstName(me.ownerName) : ""}
+        <span className="profile-chip-name">{me ? firstName(me.ownerName) : ""}</span>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
