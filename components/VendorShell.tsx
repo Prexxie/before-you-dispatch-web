@@ -23,7 +23,7 @@ export default function VendorShell({
           </span>
           WakaRoute
         </Link>
-        <div className="row-flex" style={{ gap: 20, alignItems: "center" }}>
+        <div className="topbar-actions">
           <Link href="/vendor" className="navlink">
             Dashboard
             <LiveAttentionPill />
