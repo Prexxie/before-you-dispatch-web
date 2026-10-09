@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { ReactNode, useEffect, useState } from "react";
 import { ThemeColor } from "@/lib/api";
 import { AttentionPill, useAttentionCount } from "./AttentionCount";
 import { themeStyle } from "@/lib/theme";
@@ -39,10 +40,23 @@ export default function AppShell({
   children: ReactNode;
 }) {
   const attention = useAttentionCount();
+  // Phones: the sidebar is a drawer opened from the top bar.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname();
+  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
   return (
     <div className="page">
       <div className="app-shell" style={themeColor ? themeStyle(themeColor) : undefined}>
-        <nav className="sidebar" aria-label="Main">
+        {menuOpen && (
+          <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+        )}
+        <nav id="main-nav" className={`sidebar${menuOpen ? " open" : ""}`} aria-label="Main">
           <div className="sidebar-brand">
             <LogoMark size={18} />
             WakaRoute
@@ -91,6 +105,18 @@ export default function AppShell({
 
         <div className="app-main">
           <header className="app-topbar">
+            <button
+              type="button"
+              className="app-menu-btn"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              aria-controls="main-nav"
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
             <Link href="/vendor" className="app-topbar-brand items-center gap-2 font-bold text-ink">
               <LogoMark size={18} />
               WakaRoute

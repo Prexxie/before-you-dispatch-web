@@ -1982,9 +1982,56 @@ body {
     border-radius: 4px;
   }
 
+  .app-menu-btn,
+  .sidebar-backdrop {
+    display: none;
+  }
   @media (max-width: 900px) {
+    /* The sidebar becomes a drawer, opened from the menu button. */
     .sidebar {
-      display: none;
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 60;
+      width: min(280px, 85vw);
+      overflow-y: auto;
+      transform: translateX(-100%);
+      visibility: hidden;
+      transition: transform 0.25s ease, visibility 0s linear 0.25s;
+      box-shadow: none;
+    }
+    .sidebar.open {
+      transform: none;
+      visibility: visible;
+      transition: transform 0.25s ease;
+      box-shadow: 0 0 40px rgba(28, 25, 23, 0.25);
+    }
+    .sidebar-backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 55;
+      background: rgba(28, 25, 23, 0.45);
+    }
+    .app-menu-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      margin-left: -8px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .app-menu-btn:hover {
+      background: var(--brand-tint);
+    }
+    .app-topbar-brand {
+      margin-right: auto;
     }
     .app-topbar {
       padding: 0 20px;

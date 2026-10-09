@@ -16,14 +16,21 @@ export function ScrollReveal() {
     if (typeof IntersectionObserver === "undefined") return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const els = document.querySelectorAll<HTMLElement>(".lp-reveal, .lp-draw");
+    // "Visible" means 15% of the element, or 15% of the screen's height for
+    // an element taller than that (on a phone the stacked comparison is
+    // several screens tall, so 15% of it is never on screen at once).
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          e.target.classList.toggle("in", e.isIntersecting);
+          const seen =
+            e.isIntersecting &&
+            (e.intersectionRatio >= 0.15 ||
+              e.intersectionRect.height >= window.innerHeight * 0.15);
+          e.target.classList.toggle("in", seen);
         }
       },
-      // A bit of margin so things reset once well out of sight, not at the edge.
-      { threshold: 0.15, rootMargin: "0px 0px -4% 0px" },
+      // Fine steps so tall elements are re-checked as they scroll by.
+      { threshold: Array.from({ length: 51 }, (_, i) => i / 50), rootMargin: "0px 0px -4% 0px" },
     );
     els.forEach((el) => {
       el.classList.add("pre");
